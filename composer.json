@@ -1,0 +1,24 @@
+{
+    "name": "callismart/dbal",
+    "description": "Engine agnostic database abstraction layer. Supports MYSQL, PostgreSQL and SQLite.",
+    "type": "library",
+    "require": {
+
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.1"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Callismart\\Dbal\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "CallismartLtd",
+            "email": "admin@callismart.com.ng"
+        }
+    ],
+    "minimum-stability": "stable"
+}
