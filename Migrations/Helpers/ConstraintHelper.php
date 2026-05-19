@@ -3,16 +3,16 @@
  * Constraint Helper class file.
  *
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations\Helpers;
+namespace Callismart\DBAL\Migrations\Helpers;
 
 use Exception;
-use SmartLicenseServer\Database\Database;
-use SmartLicenseServer\Database\Query\SQLBuilder;
-use SmartLicenseServer\Database\Utils\Constraint;
+use Callismart\DBAL\Database;
+use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBAL\Utils\Constraint;
 
 /**
  * Provides fluent interface for constraint operations.

@@ -3,14 +3,14 @@
  * Abstract database inspector implementation
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Inspection\Providers
+ * @package Callismart\DBAL\Inspection\Providers
  */
 
-namespace SmartLicenseServer\Database\Inspection\Providers;
+namespace Callismart\DBAL\Inspection\Providers;
 
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
-use SmartLicenseServer\Database\Inspection\Contracts\InspectionInterface;
-use SmartLicenseServer\Database\DBConfigDTO;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\Inspection\Contracts\InspectionInterface;
+use Callismart\DBAL\DBConfigDTO;
 
 /**
  * Base inspector class with shared logic for all database engines.

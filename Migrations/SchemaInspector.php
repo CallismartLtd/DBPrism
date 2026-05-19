@@ -3,13 +3,13 @@
  * Schema Inspector for Table Introspection
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
-use SmartLicenseServer\Database\Database;
+use Callismart\DBAL\Database;
 
 /**
  * Provides fluent interface for querying table structure.

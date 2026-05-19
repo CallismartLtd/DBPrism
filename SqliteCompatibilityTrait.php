@@ -1,5 +1,5 @@
 <?php
-namespace SmartLicenseServer\Database;
+namespace Callismart\DBAL;
 
 trait SqliteCompatibilityTrait {
 

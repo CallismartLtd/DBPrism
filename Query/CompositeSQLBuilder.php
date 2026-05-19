@@ -5,16 +5,16 @@
  * Supports UNION / UNION ALL composition of SQLBuilder queries.
  *
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query
+ * @package Callismart\DBAL\Query
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Query;
+namespace Callismart\DBAL\Query;
 
-use SmartLicenseServer\Database\Query\Renderers\CompositeRenderer;
-use SmartLicenseServer\Database\Query\Renderers\MySQLCompositeRenderer;
-use SmartLicenseServer\Database\Query\Renderers\PostgreSQLCompositeRenderer;
-use SmartLicenseServer\Database\Query\Renderers\SQLiteCompositeRenderer;
+use Callismart\DBAL\Query\Renderers\CompositeRenderer;
+use Callismart\DBAL\Query\Renderers\MySQLCompositeRenderer;
+use Callismart\DBAL\Query\Renderers\PostgreSQLCompositeRenderer;
+use Callismart\DBAL\Query\Renderers\SQLiteCompositeRenderer;
 
 /**
  * CompositeSQLBuilder

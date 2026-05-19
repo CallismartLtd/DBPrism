@@ -3,12 +3,12 @@
  * Database Column class file.
  *
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Schema
+ * @package Callismart\DBAL\Schema
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Utils;
+namespace Callismart\DBAL\Utils;
 
 /**
  * Represents a single column in a database table schema.
@@ -24,7 +24,7 @@ class Column {
     public string $name;
 
     /** 
-     * @see \SmartLicenseServer\Database\Utils\ColumnType
+     * @see \Callismart\DBAL\Utils\ColumnType
      * @var int $type Column type.
      */
     public int $type;
@@ -93,7 +93,7 @@ class Column {
      * 
      * @param int $type
      * @return static
-     * @see \SmartLicenseServer\Database\Utils\ColumnType
+     * @see \Callismart\DBAL\Utils\ColumnType
      */
     public function type( int $type ) : static {
         $this->type = $type;

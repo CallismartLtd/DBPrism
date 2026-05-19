@@ -8,7 +8,7 @@
 
 declare( strict_types = 1 );
 
-namespace SmartLicenseServer\Database;
+namespace Callismart\DBAL;
 
 use LogicException;
 use Callismart\DTO\DTO;

@@ -3,18 +3,18 @@
  * CreateTable Query Intent class file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\QueryIntents
+ * @package Callismart\DBAL\Query\QueryIntents
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
-use SmartLicenseServer\Database\Query\SQLBuilder;
-use SmartLicenseServer\Database\Query\SQLBuilderStrategyTrait;
-use SmartLicenseServer\Database\Utils\Column;
-use SmartLicenseServer\Database\Utils\Constraint;
-use SmartLicenseServer\Database\Schema\Table;
+use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
+use Callismart\DBAL\Utils\Column;
+use Callismart\DBAL\Utils\Constraint;
+use Callismart\DBAL\Schema\Table;
 
 /**
  * Represents an intent to create a database table.

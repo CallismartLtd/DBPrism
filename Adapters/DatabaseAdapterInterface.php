@@ -9,7 +9,7 @@
  * @package SmartLicenseServer\Interfaces
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 /**
  * Database Adapter Interface

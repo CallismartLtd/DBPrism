@@ -3,12 +3,12 @@
  * Database Adapter interface file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database
+ * @package Callismart\DBAL
  */
 
-namespace SmartLicenseServer\Database\Adapters\Contracts;
+namespace Callismart\DBAL\Adapters\Contracts;
 
-use SmartLicenseServer\Database\DBConfigDTO;
+use Callismart\DBAL\DBConfigDTO;
 
 /**
  * Database adapter contracts.

@@ -3,16 +3,16 @@
  * Persistence Query Intent class file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\QueryIntents
+ * @package Callismart\DBAL\Query\QueryIntents
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
-use SmartLicenseServer\Database\Query\SQLBuilder;
+use Callismart\DBAL\Query\SQLBuilder;
 use InvalidArgumentException;
-use SmartLicenseServer\Database\Query\SQLBuilderStrategyTrait;
+use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
 
 /**
  * Represents an intent to persist or modify data (INSERT/UPDATE).

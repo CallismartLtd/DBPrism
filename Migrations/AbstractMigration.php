@@ -3,19 +3,19 @@
  * Abstract Migration Base Class
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
-use SmartLicenseServer\Database\Database;
-use SmartLicenseServer\Database\Inspection\Inspector;
-use SmartLicenseServer\Database\Migrations\Helpers\ColumnHelper;
-use SmartLicenseServer\Database\Migrations\Helpers\ConstraintHelper;
-use SmartLicenseServer\Database\Migrations\Helpers\IndexHelper;
-use SmartLicenseServer\Database\Migrations\Helpers\TableHelper;
-use SmartLicenseServer\Database\Query\SQLBuilder;
+use Callismart\DBAL\Database;
+use Callismart\DBAL\Inspection\Inspector;
+use Callismart\DBAL\Migrations\Helpers\ColumnHelper;
+use Callismart\DBAL\Migrations\Helpers\ConstraintHelper;
+use Callismart\DBAL\Migrations\Helpers\IndexHelper;
+use Callismart\DBAL\Migrations\Helpers\TableHelper;
+use Callismart\DBAL\Query\SQLBuilder;
 
 /**
  * Base class for all database migrations.

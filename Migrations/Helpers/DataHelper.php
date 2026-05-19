@@ -3,13 +3,13 @@
  * Data Helpers class file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations\Helpers;
+namespace Callismart\DBAL\Migrations\Helpers;
 
-use SmartLicenseServer\Database\Database;
+use Callismart\DBAL\Database;
 
 /**
  * Provides fluent interface for safe data transformations.

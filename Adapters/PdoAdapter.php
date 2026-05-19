@@ -5,16 +5,16 @@
  * Implements the DatabaseAdapterInterface for environments using PDO (PHP Data Objects).
  * This is the preferred adapter for non-framework pure PHP environments.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 use PDO;
 use PDOException;
 use PDOStatement;
-use SmartLicenseServer\Database\DBConfigDTO;
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for PDO database access.

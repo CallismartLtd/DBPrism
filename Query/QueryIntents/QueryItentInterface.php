@@ -6,7 +6,7 @@
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
 interface QueryItentInterface {
     /**

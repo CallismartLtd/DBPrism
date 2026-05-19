@@ -3,11 +3,11 @@
  * Migration Interface
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
 /**
  * Interface that all database migrations must implement.

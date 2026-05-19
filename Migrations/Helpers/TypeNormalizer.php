@@ -3,11 +3,11 @@
  * Type Normalizer for Database Abstraction
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations\Helpers;
+namespace Callismart\DBAL\Migrations\Helpers;
 
 /**
  * Normalizes SQL data types across different database engines.

@@ -5,7 +5,7 @@
  * @author Callistus Nwachukwu
  */
 
-namespace SmartLicenseServer\Database\Query;
+namespace Callismart\DBAL\Query;
 
 trait SQLBuilderStrategyTrait {
     /**

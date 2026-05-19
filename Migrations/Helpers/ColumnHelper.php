@@ -3,16 +3,16 @@
  * Column Helper for Fluent Column Operations
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations\Helpers;
+namespace Callismart\DBAL\Migrations\Helpers;
 
-use SmartLicenseServer\Database\Database;
-use SmartLicenseServer\Database\Query\SQLBuilder;
-use SmartLicenseServer\Database\Utils\Column;
-use SmartLicenseServer\Database\Utils\Constraint;
+use Callismart\DBAL\Database;
+use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBAL\Utils\Column;
+use Callismart\DBAL\Utils\Constraint;
 
 /**
  * Column migration orchestrator.
@@ -41,7 +41,7 @@ class ColumnHelper {
 	 * 
 	 * @param string|Column $column The new column name.
 	 * @param array{
-     *     type: int, // @see \SmartLicenseServer\Database\Utils\ColumnType
+     *     type: int, // @see \Callismart\DBAL\Utils\ColumnType
      *     length?: int|null,
      *     precision?: int|null,
      *     scale?: int|null,
@@ -196,7 +196,7 @@ class ColumnHelper {
 	 * Change column type.
 	 * 
 	 * @param string $column The column name.
-	 * @param int $type The column type @see \SmartLicenseServer\Database\Utils\ColumnType constants
+	 * @param int $type The column type @see \Callismart\DBAL\Utils\ColumnType constants
 	 */
 	public function changeType( string $column, int $type ) : static {
 

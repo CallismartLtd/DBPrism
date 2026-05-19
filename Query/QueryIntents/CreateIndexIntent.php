@@ -3,13 +3,13 @@
  * Create Index Intent
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\QueryIntents
+ * @package Callismart\DBAL\Query\QueryIntents
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
-use SmartLicenseServer\Database\Utils\Constraint;
+use Callismart\DBAL\Utils\Constraint;
 
 /**
  * Represents the intent to create a standalone index on an existing table.

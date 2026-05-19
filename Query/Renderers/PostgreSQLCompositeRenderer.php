@@ -1,5 +1,5 @@
 <?php
-namespace SmartLicenseServer\Database\Query\Renderers;
+namespace Callismart\DBAL\Query\Renderers;
 
 /**
  * PostgreSQL Composite Renderer.

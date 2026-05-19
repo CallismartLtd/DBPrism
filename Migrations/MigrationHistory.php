@@ -3,13 +3,13 @@
  * Migration History for Tracking Executed Migrations
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
-use SmartLicenseServer\Database\Database;
+use Callismart\DBAL\Database;
 
 /**
  * Tracks which migrations have been executed.
@@ -31,7 +31,7 @@ class MigrationHistory {
     /**
      * Database adapter instance.
      *
-     * @var \SmartLicenseServer\Database\Adapters\DatabaseAdapterInterface
+     * @var \Callismart\DBAL\Adapters\DatabaseAdapterInterface
      */
     private $adapter;
 
@@ -45,7 +45,7 @@ class MigrationHistory {
     /**
      * Constructor.
      *
-     * @param \SmartLicenseServer\Database\Adapters\DatabaseAdapterInterface $adapter The database adapter
+     * @param \Callismart\DBAL\Adapters\DatabaseAdapterInterface $adapter The database adapter
      */
     public function __construct( Database $database ) {
         $this->executor = $database;

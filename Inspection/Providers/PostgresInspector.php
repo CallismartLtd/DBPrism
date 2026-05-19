@@ -3,10 +3,10 @@
  * PostgreSQL database inspector implementation
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Inspection\Providers
+ * @package Callismart\DBAL\Inspection\Providers
  */
 
-namespace SmartLicenseServer\Database\Inspection\Providers;
+namespace Callismart\DBAL\Inspection\Providers;
 
 /**
  * Inspector for PostgreSQL databases.

@@ -3,10 +3,10 @@
  * Database schema inspection interface file
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database
+ * @package Callismart\DBAL
  */
 
-namespace SmartLicenseServer\Database\Inspection\Contracts;
+namespace Callismart\DBAL\Inspection\Contracts;
 
 /**
  * Contracts for database inspection engines.

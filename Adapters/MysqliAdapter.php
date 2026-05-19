@@ -4,15 +4,15 @@
  *
  * Implements the DatabaseAdapterInterface for environments using the mysqli extension.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 use mysqli;
 use mysqli_stmt;
-use SmartLicenseServer\Database\DBConfigDTO;
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for MySQLi database access.

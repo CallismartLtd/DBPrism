@@ -3,17 +3,17 @@
  * Schema Inspector for Table Introspection
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Inspection;
+namespace Callismart\DBAL\Inspection;
 
-use SmartLicenseServer\Database\Database;
-use SmartLicenseServer\Database\Inspection\Contracts\InspectionInterface;
-use SmartLicenseServer\Database\Inspection\Providers\MysqlInspector;
-use SmartLicenseServer\Database\Inspection\Providers\PostgresInspector;
-use SmartLicenseServer\Database\Inspection\Providers\SQLiteInspector;
+use Callismart\DBAL\Database;
+use Callismart\DBAL\Inspection\Contracts\InspectionInterface;
+use Callismart\DBAL\Inspection\Providers\MysqlInspector;
+use Callismart\DBAL\Inspection\Providers\PostgresInspector;
+use Callismart\DBAL\Inspection\Providers\SQLiteInspector;
 
 /**
  * Database Schema Inspection Facade

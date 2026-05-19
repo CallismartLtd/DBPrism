@@ -3,22 +3,22 @@
  * Abstract Query Renderer - Abstract Base Class
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\Renderers
+ * @package Callismart\DBAL\Query\Renderers
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Query\Renderers;
+namespace Callismart\DBAL\Query\Renderers;
 
-use SmartLicenseServer\Database\Query\QueryIntents\AlterTableIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\CreateIndexIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\CreateTableIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\DeleteIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\PersistenceIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\SelectionIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\TruncateTableIntent;
-use SmartLicenseServer\Database\Utils\Constraint;
-use SmartLicenseServer\Database\Utils\ColumnType;
-use SmartLicenseServer\Database\Utils\DefaultColumnValue;
+use Callismart\DBAL\Query\QueryIntents\AlterTableIntent;
+use Callismart\DBAL\Query\QueryIntents\CreateIndexIntent;
+use Callismart\DBAL\Query\QueryIntents\CreateTableIntent;
+use Callismart\DBAL\Query\QueryIntents\DeleteIntent;
+use Callismart\DBAL\Query\QueryIntents\PersistenceIntent;
+use Callismart\DBAL\Query\QueryIntents\SelectionIntent;
+use Callismart\DBAL\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBAL\Utils\Constraint;
+use Callismart\DBAL\Utils\ColumnType;
+use Callismart\DBAL\Utils\DefaultColumnValue;
 
 /**
  * Provides a blueprint for engine-specific SQL renderers.

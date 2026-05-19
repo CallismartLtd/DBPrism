@@ -3,11 +3,11 @@
  * Migration Registry class file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
 /**
  * Registry for discovering and managing migrations.
@@ -113,7 +113,7 @@ class MigrationRegistry {
         if ( preg_match( '/namespace\s+([^;]+);/', $content, $matches ) ) {
             return trim( $matches[1] );
         }
-        return 'SmartLicenseServer\Database\Migrations';
+        return 'Callismart\DBAL\Migrations';
     }
 
     /**

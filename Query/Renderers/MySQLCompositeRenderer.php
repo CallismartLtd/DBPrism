@@ -1,5 +1,5 @@
 <?php
-namespace SmartLicenseServer\Database\Query\Renderers;
+namespace Callismart\DBAL\Query\Renderers;
 
 /**
  * MySQL Composite Renderer.
@@ -9,7 +9,7 @@ class MySQLCompositeRenderer implements CompositeRenderer {
     /**
      * Render UNION query.
      *
-     * @param \SmartLicenseServer\Database\Query\SQLBuilder[] $queries
+     * @param \Callismart\DBAL\Query\SQLBuilder[] $queries
      * @param string       $type
      * @param array        $intent
      *

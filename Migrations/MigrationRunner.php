@@ -3,11 +3,11 @@
  * Migration Runner
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations;
+namespace Callismart\DBAL\Migrations;
 
 /**
  * Executes registered migrations.
@@ -36,7 +36,7 @@ class MigrationRunner {
     /**
      * Database adapter.
      *
-     * @var \SmartLicenseServer\Database\Adapters\DatabaseAdapterInterface
+     * @var \Callismart\DBAL\Adapters\DatabaseAdapterInterface
      */
     private $adapter;
 

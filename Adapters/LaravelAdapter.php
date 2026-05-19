@@ -5,10 +5,10 @@
  * Implements the DatabaseAdapterInterface for Laravel environments
  * using Laravel's DB facade and query builder.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;

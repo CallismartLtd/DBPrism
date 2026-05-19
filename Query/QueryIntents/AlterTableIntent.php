@@ -3,17 +3,17 @@
  * AlterTable Query Intent class file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\QueryIntents
+ * @package Callismart\DBAL\Query\QueryIntents
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
-use SmartLicenseServer\Database\Query\SQLBuilder;
-use SmartLicenseServer\Database\Query\SQLBuilderStrategyTrait;
-use SmartLicenseServer\Database\Utils\Column;
-use SmartLicenseServer\Database\Utils\Constraint;
+use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
+use Callismart\DBAL\Utils\Column;
+use Callismart\DBAL\Utils\Constraint;
 
 /**
  * Represents an intent to alter an existing database table.
@@ -69,8 +69,8 @@ class AlterTableIntent {
      * By splitting these, the Renderer receives clean, individual DTOs
      * for 'ADD_COLUMN' and 'ADD_CONSTRAINT'.
      * 
-     * @param \SmartLicenseServer\Database\Schema\Column $column
-     * @param \SmartLicenseServer\Database\Schema\Constraint|null $constraint
+     * @param \Callismart\DBAL\Schema\Column $column
+     * @param \Callismart\DBAL\Schema\Constraint|null $constraint
      * @return static
      */
     public function add_column( Column $column, ?Constraint $constraint = null ) : static {
@@ -95,8 +95,8 @@ class AlterTableIntent {
     /**
      * Modify a column and optionally add/update a constraint.
      * 
-     * @param \SmartLicenseServer\Database\Schema\Column $column
-     * @param \SmartLicenseServer\Database\Schema\Constraint|null $constraint
+     * @param \Callismart\DBAL\Schema\Column $column
+     * @param \Callismart\DBAL\Schema\Constraint|null $constraint
      * @return static
      */
     public function modify_column( Column $column, ?Constraint $constraint = null ) : static {

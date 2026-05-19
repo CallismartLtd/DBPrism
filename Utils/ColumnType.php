@@ -3,12 +3,12 @@
  * Database Column Type class file.
  *
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Schema
+ * @package Callismart\DBAL\Schema
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Utils;
+namespace Callismart\DBAL\Utils;
 
 use InvalidArgumentException;
 

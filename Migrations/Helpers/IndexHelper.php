@@ -3,14 +3,14 @@
  * Index Helper for Fluent Index Operations
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Migrations
+ * @package Callismart\DBAL\Migrations
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Migrations\Helpers;
+namespace Callismart\DBAL\Migrations\Helpers;
 
-use SmartLicenseServer\Database\Database;
-use SmartLicenseServer\Database\Query\SQLBuilder;
+use Callismart\DBAL\Database;
+use Callismart\DBAL\Query\SQLBuilder;
 
 /**
  * Provides fluent interface for index operations.

@@ -3,12 +3,12 @@
  * Query Criteria Trait file.
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query\Traits
+ * @package Callismart\DBAL\Query\Traits
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace SmartLicenseServer\Database\Query\QueryIntents;
+namespace Callismart\DBAL\Query\QueryIntents;
 
 /**
  * Provides fluent methods for building query conditions and managing bindings.

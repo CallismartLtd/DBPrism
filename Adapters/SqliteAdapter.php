@@ -4,17 +4,17 @@
  *
  * Implements the DatabaseAdapterInterface using the native SQLite3 PHP extension.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 use SQLite3;
 use Exception;
-use SmartLicenseServer\Database\DBConfigDTO;
-use SmartLicenseServer\Database\SqliteCompatibilityTrait;
+use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBAL\SqliteCompatibilityTrait;
 use SQLite3Result;
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for native SQLite3 database access.

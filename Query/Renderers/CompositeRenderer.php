@@ -1,5 +1,5 @@
 <?php
-namespace SmartLicenseServer\Database\Query\Renderers;
+namespace Callismart\DBAL\Query\Renderers;
 
 /**
  * Composite Renderer Contract.
@@ -9,7 +9,7 @@ interface CompositeRenderer {
     /**
      * Render UNION / UNION ALL query.
      *
-     * @param \SmartLicenseServer\Database\Query\SQLBuilder[] $queries
+     * @param \Callismart\DBAL\Query\SQLBuilder[] $queries
      * @param string       $type
      * @param array        $intent
      *

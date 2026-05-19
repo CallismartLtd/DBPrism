@@ -2,13 +2,13 @@
 /**
  * The Database Abstraction file.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database;
+namespace Callismart\DBAL;
 
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Database abstraction API.
@@ -42,7 +42,7 @@ use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
  * @method string get_driver() Get the engine type (mysql, sqlite, etc).
  * @method string|null get_host_info() Get connection host information.
  * @method string|int|null get_protocol_version() Get the database protocol version.
- * @method \SmartLicenseServer\Database\DBConfigDTO get_config() Get the database protocol version.
+ * @method \Callismart\DBAL\DBConfigDTO get_config() Get the database protocol version.
  *
  * @method bool is_connected() Check whether the database connection is alive.
  */

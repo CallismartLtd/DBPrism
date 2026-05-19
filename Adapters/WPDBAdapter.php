@@ -5,14 +5,14 @@
  * Implements the DatabaseAdapterInterface for WordPress environments
  * using the global $wpdb object.
  *
- * @package SmartLicenseServer\Database\Adapters
+ * @package Callismart\DBAL\Adapters
  */
 
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
-use SmartLicenseServer\Database\DBConfigDTO;
+use Callismart\DBAL\DBConfigDTO;
 use wpdb;
-use SmartLicenseServer\Database\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for WordPress database access.

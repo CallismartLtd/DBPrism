@@ -1,9 +1,9 @@
 <?php
-namespace SmartLicenseServer\Database\Adapters;
+namespace Callismart\DBAL\Adapters;
 
 use PDO;
 use PDOStatement;
-use SmartLicenseServer\Database\PostgresCompatibilityTrait;
+use Callismart\DBAL\PostgresCompatibilityTrait;
 
 /**
  * Postgres Adapter extending the generic PDO Adapter.

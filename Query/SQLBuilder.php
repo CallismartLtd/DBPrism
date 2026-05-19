@@ -3,22 +3,22 @@
  * SQL Query Builder - Intent Layer (Engine-Agnostic)
  * 
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer\Database\Query
+ * @package Callismart\DBAL\Query
  * @since 0.2.0
  */
 
-namespace SmartLicenseServer\Database\Query;
+namespace Callismart\DBAL\Query;
 
-use SmartLicenseServer\Database\Query\QueryIntents\CreateTableIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\AlterTableIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\DeleteIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\PersistenceIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\SelectionIntent;
-use SmartLicenseServer\Database\Query\QueryIntents\TruncateTableIntent;
-use SmartLicenseServer\Database\Query\Renderers\AbstractQueryRenderer;
-use SmartLicenseServer\Database\Query\Renderers\MySQLRenderer;
-use SmartLicenseServer\Database\Query\Renderers\PostgreSQLRenderer;
-use SmartLicenseServer\Database\Query\Renderers\SQLiteRenderer;
+use Callismart\DBAL\Query\QueryIntents\CreateTableIntent;
+use Callismart\DBAL\Query\QueryIntents\AlterTableIntent;
+use Callismart\DBAL\Query\QueryIntents\DeleteIntent;
+use Callismart\DBAL\Query\QueryIntents\PersistenceIntent;
+use Callismart\DBAL\Query\QueryIntents\SelectionIntent;
+use Callismart\DBAL\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBAL\Query\Renderers\AbstractQueryRenderer;
+use Callismart\DBAL\Query\Renderers\MySQLRenderer;
+use Callismart\DBAL\Query\Renderers\PostgreSQLRenderer;
+use Callismart\DBAL\Query\Renderers\SQLiteRenderer;
 
 /**
  * SQLBuilder - Intent Layer Only

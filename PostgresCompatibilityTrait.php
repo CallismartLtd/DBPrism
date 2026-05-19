@@ -1,5 +1,5 @@
 <?php
-namespace SmartLicenseServer\Database;
+namespace Callismart\DBAL;
 
 trait PostgresCompatibilityTrait {
     protected function translate_mysql_to_postgres(string $sql): string {
