@@ -43,4 +43,6 @@ trait SQLBuilderStrategyTrait {
 
         return $sql;
     }
+
+    abstract public function get_bindings() : array;
 }
