@@ -10,16 +10,16 @@ namespace Callismart\DBPrism\Tests\Query\Renderer;
 use PHPUnit\Framework\TestCase;
 use function Callismart\DBPrism\tests\queryBuilder;
 use function Callismart\DBPrism\tests\dbal;
+use function Callismart\DBPrism\tests\dbDriver;
 
 final class SelectionRendererTest extends TestCase {
 
     private function engine(): string {
-        return dbal()->get_driver();
+        return dbDriver();
     }
 
-    private function quote(string $identifier): string {
-
-        $wrapper = match ($this->engine()) {
+    private function quote( string $identifier ): string {
+        $wrapper = match ( $this->engine() ) {
             'mysql'  => '`',
             'sqlite' => '"',
             'pgsql'  => '"',
