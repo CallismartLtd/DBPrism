@@ -199,9 +199,6 @@ trait QueryCriteriaTrait {
      * @return static
      */
     public function where_group( callable $callback, string $boolean = 'AND' ) : static {
-
-        // Create a fresh instance to isolate grouped conditions
-        /** @disregard */
         $group = $this->new_instance();
 
         $callback( $group );
@@ -247,4 +244,6 @@ trait QueryCriteriaTrait {
     public function get_conditions() : array {
         return $this->conditions;
     }
+
+    abstract public function new_instance() : static;
 }

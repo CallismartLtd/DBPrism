@@ -9,6 +9,7 @@
 
 namespace Callismart\DBAL\Migrations;
 
+use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
 use Callismart\DBAL\Database;
 
 /**
@@ -26,14 +27,14 @@ class MigrationHistory {
      *
      * @var string
      */
-    private $table = 'smliser_migrations';
+    private $table = 'callismartdbal_migrations';
 
     /**
      * Database adapter instance.
      *
-     * @var \Callismart\DBAL\Adapters\DatabaseAdapterInterface
+     * @var DatabaseAdapterInterface
      */
-    private $adapter;
+    private DatabaseAdapterInterface $adapter;
 
     /**
      * Statement executor instance.

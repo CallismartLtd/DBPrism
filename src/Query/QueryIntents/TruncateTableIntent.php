@@ -11,6 +11,7 @@ namespace Callismart\DBAL\Query\QueryIntents;
 
 use Callismart\DBAL\Query\SQLBuilder;
 use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
+use Exception;
 
 /**
  * Represents an intent to wipe all data from one or more database tables.
@@ -101,5 +102,12 @@ class TruncateTableIntent {
         $static->builder = $builder;
 
         return $static;
+    }
+
+    /**
+     * No-op.
+     */
+    public function get_bindings() : array {
+        throw new Exception( 'Query parameter binding not supported for admin intents' );
     }
 }

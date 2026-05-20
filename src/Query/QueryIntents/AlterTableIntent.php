@@ -14,6 +14,7 @@ use Callismart\DBAL\Query\SQLBuilder;
 use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
 use Callismart\DBAL\Utils\Column;
 use Callismart\DBAL\Utils\Constraint;
+use Exception;
 
 /**
  * Represents an intent to alter an existing database table.
@@ -69,8 +70,8 @@ class AlterTableIntent {
      * By splitting these, the Renderer receives clean, individual DTOs
      * for 'ADD_COLUMN' and 'ADD_CONSTRAINT'.
      * 
-     * @param \Callismart\DBAL\Schema\Column $column
-     * @param \Callismart\DBAL\Schema\Constraint|null $constraint
+     * @param Column $column
+     * @param Constraint|null $constraint
      * @return static
      */
     public function add_column( Column $column, ?Constraint $constraint = null ) : static {
@@ -95,8 +96,8 @@ class AlterTableIntent {
     /**
      * Modify a column and optionally add/update a constraint.
      * 
-     * @param \Callismart\DBAL\Schema\Column $column
-     * @param \Callismart\DBAL\Schema\Constraint|null $constraint
+     * @param Column $column
+     * @param Constraint|null $constraint
      * @return static
      */
     public function modify_column( Column $column, ?Constraint $constraint = null ) : static {
@@ -233,5 +234,12 @@ class AlterTableIntent {
         $static->builder    = $builder;
 
         return $static;
+    }
+
+    /**
+     * No-op.
+     */
+    public function get_bindings() : array {
+        throw new Exception( 'Query parameter binding not supported for admin intents' );
     }
 }

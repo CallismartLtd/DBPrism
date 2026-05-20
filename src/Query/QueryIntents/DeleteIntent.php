@@ -72,4 +72,8 @@ class DeleteIntent {
 
         return $static;
     }
+
+    public function new_instance() : static {
+        return new static( $this->table_name );
+    }
 }

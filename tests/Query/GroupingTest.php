@@ -7,6 +7,11 @@ declare( strict_types=1 );
 
 use PHPUnit\Framework\TestCase;
 
+use function Callismart\DBAL\tests\{
+    queryBuilder,
+    dbal
+};
+
 final class GroupingTest extends TestCase {
 
     /**
@@ -16,7 +21,7 @@ final class GroupingTest extends TestCase {
      */
     public function test_where_group() : void {
 
-        $query = smliserQueryBuilder()
+        $query = queryBuilder()
             ->select( '*' )
             ->from( 'wp_users' )
             ->where( 'id', '=', 1 )
@@ -27,7 +32,7 @@ final class GroupingTest extends TestCase {
 
             });
 
-        $engine = smliser_db()->get_driver();
+        $engine = dbal()->get_driver();
 
         if ( $engine === 'mysql' ) {
 
@@ -57,7 +62,7 @@ final class GroupingTest extends TestCase {
      */
     public function test_nested_where_group() : void {
 
-        $query = smliserQueryBuilder()
+        $query = queryBuilder()
             ->select( '*' )
             ->from( 'wp_users' )
             ->where_group( function ( $q ) {
@@ -72,7 +77,7 @@ final class GroupingTest extends TestCase {
 
             });
 
-        $engine = smliser_db()->get_driver();
+        $engine = dbal()->get_driver();
 
         if ( $engine === 'mysql' ) {
 

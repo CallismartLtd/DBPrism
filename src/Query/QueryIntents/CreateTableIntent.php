@@ -14,7 +14,8 @@ use Callismart\DBAL\Query\SQLBuilder;
 use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
 use Callismart\DBAL\Utils\Column;
 use Callismart\DBAL\Utils\Constraint;
-use Callismart\DBAL\Schema\Table;
+use Callismart\DBAL\Utils\Table;
+use Exception;
 
 /**
  * Represents an intent to create a database table.
@@ -132,5 +133,12 @@ class CreateTableIntent {
         $static->builder    = $builder;
 
         return $static;
+    }
+
+    /**
+     * No-op.
+     */
+    public function get_bindings() : array {
+        throw new Exception( 'Query parameter binding not supported for admin intents' );
     }
 }

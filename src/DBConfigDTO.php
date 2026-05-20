@@ -3,7 +3,7 @@
  * Database configuration data transfer object file.
  *
  * @author Callistus Nwachukwu
- * @package SmartLicenseServer
+ * @package Callismart
  */
 
 declare( strict_types = 1 );
