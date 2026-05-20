@@ -1,3 +1,5 @@
 /vendor/
 .vscode
 .phpunit.result.cache
+*.db
+test.php

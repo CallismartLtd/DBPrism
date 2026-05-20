@@ -29,7 +29,7 @@ class TableHelper {
 	 *
 	 * @var string
 	 */
-	private string $engine;
+	protected string $engine;
 
 	/**
 	 * Constructor.

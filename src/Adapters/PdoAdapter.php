@@ -468,7 +468,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
         }
 
         // Store insert ID for INSERT queries
-        $this->insert_id = $this->pdo->lastInsertId() ?: null;
+        $this->insert_id = (int) $this->pdo->lastInsertId() ?: null;
 
         return $this->get_insert_id();
     }
@@ -575,7 +575,9 @@ class PdoAdapter implements DatabaseAdapterInterface {
      */
     public function get_driver() : string {
         $this->ensure_connection();
-        return $this->is_connected() ? (string) $this->pdo->getAttribute( PDO::ATTR_DRIVER_NAME ) : 'unknown';
+        return $this->is_connected() ? 
+        (string) $this->pdo->getAttribute( PDO::ATTR_DRIVER_NAME ) :
+        $this->config->driver ?? 'unknown';
     }
 
     /**
@@ -612,6 +614,10 @@ class PdoAdapter implements DatabaseAdapterInterface {
 
         if ( ! $stmt ) {
             return 0;
+        }
+
+        if ( $this->pdo->lastInsertId() ) {
+            $this->insert_id    = (int) $this->pdo->lastInsertId();
         }
 
         return $stmt->rowCount();

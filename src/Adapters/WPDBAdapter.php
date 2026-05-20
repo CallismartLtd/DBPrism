@@ -44,7 +44,7 @@ class WPDBAdapter implements DatabaseAdapterInterface {
     protected $insert_id = null;
 
     /**
-     * Constructor.
+     * Constructor. 
      *
      * Initializes the adapter with the global $wpdb instance.
      *

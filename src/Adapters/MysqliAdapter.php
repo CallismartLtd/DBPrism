@@ -13,6 +13,8 @@ use mysqli;
 use mysqli_stmt;
 use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use mysqli_sql_exception;
+use Throwable;
 
 /**
  * Adapter for MySQLi database access.
@@ -70,28 +72,34 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      * @return bool True on success, false on failure.
      */
     protected function connect() : bool {
-        if ( $this->is_connected() ) {
-            return true;
-        }
-        
-        // Suppress connection error output.
-        $mysqli = @new mysqli(
-            $this->config->host,
-            $this->config->username,
-            $this->config->password,
-            $this->config->dbname,
-            $this->config->port,
-            $this->config->socket
-        );
+        try {
+            if ( $this->is_connected() ) {
+                return true;
+            }
+            
+            // Suppress connection error output.
+            $mysqli = @new mysqli(
+                $this->config->host,
+                $this->config->username,
+                $this->config->password,
+                $this->config->dbname,
+                $this->config->port,
+                $this->config->socket
+            );
 
-        if ( $mysqli->connect_error ) {
-            $this->last_error = 'Connect Error (' . $mysqli->connect_errno . ') ' . $mysqli->connect_error;
+            if ( $mysqli->connect_error ) {
+                $this->last_error = 'Connect Error (' . $mysqli->connect_errno . ') ' . $mysqli->connect_error;
+                return false;
+            }
+
+            $this->mysqli = $mysqli;
+            $this->mysqli->set_charset( $this->config->charset ?? 'utf8mb4' );
+            return true;
+        } catch( Throwable $th ) {
+            $this->last_error   = $th->getMessage();
+
             return false;
         }
-
-        $this->mysqli = $mysqli;
-        $this->mysqli->set_charset( $this->config->charset ?? 'utf8mb4' );
-        return true;
     }
 
     /**

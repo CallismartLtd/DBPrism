@@ -221,6 +221,7 @@ class MySQLRenderer extends AbstractQueryRenderer {
      * Render Column Definition.
      */
     protected function render_column_definition( Column $column ) : string {
+
         $parts = [
             $this->quote_identifier( $column->name ),
             $this->normalize_type( $column->type, [
@@ -230,9 +231,21 @@ class MySQLRenderer extends AbstractQueryRenderer {
             ])
         ];
 
-        if ( ! $column->nullable ) $parts[] = 'NOT NULL';
-        if ( $column->default !== null ) $parts[] = "DEFAULT " . $this->format_value( $column->default );
-        if ( $column->auto_increment ) $parts[] = 'AUTO_INCREMENT';
+        if ( $column->unsigned ) {
+            $parts[] = 'UNSIGNED';
+        }
+
+        if ( ! $column->nullable ) {
+            $parts[] = 'NOT NULL';
+        }
+
+        if ( $column->default !== null ) {
+            $parts[] = "DEFAULT " . $this->format_value( $column->default );
+        }
+
+        if ( $column->auto_increment ) {
+            $parts[] = 'AUTO_INCREMENT';
+        }
 
         return implode( ' ', $parts );
     }
