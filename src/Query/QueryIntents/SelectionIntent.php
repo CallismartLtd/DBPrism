@@ -60,6 +60,11 @@ class SelectionIntent implements QueryItentInterface{
     protected ?int $offset = null;
 
     /**
+     * @var bool $distinct
+     */
+    protected bool $distinct = false;
+
+    /**
      * Private constructor to enforce static factory usage.
      */
     private function __construct( SQLBuilder $builder ) {
@@ -67,13 +72,59 @@ class SelectionIntent implements QueryItentInterface{
     }
 
     /**
-     * Static factory to initialize a selection intent with specific columns.
+     * Initialize a selection intent with specific columns.
      * 
      * @param string ...$columns Variadic list of column names.
      * @return static
      */
     public function select( string ...$columns ) : static {
-        $this->columns = $columns;
+        foreach ( $columns as $column ) {
+            $this->columns[] = $this->normalize_column( $column );
+        }
+        
+        return $this;
+    }
+
+    /**
+     * Normalize columns
+     * 
+     * @param string $column
+     * @return array
+     */
+    protected function normalize_column( string $column ) : array {
+        if ( '*' === $column || '' === $column ) {
+            return [
+                'type'  => 'column',
+                'value' => '*'
+            ];
+        }
+
+        if ( preg_match('/\w+\s*\(.*\)/', $column ) ) {
+            return ['type' => 'expression', 'value' => $column];
+        }
+
+        if ( str_contains( $column, ' ' ) ) {
+            [$value, $alias] = explode( ' ', $column, 2 );
+
+            return [
+                'type' => 'column',
+                'value' => $value,
+                'alias' => $alias
+            ];
+        }
+
+        return ['type' => 'column', 'value' => $column];
+    } 
+
+    /**
+     * Set the distinct flag
+     * 
+     * @param bool $value
+     * @return static
+     */
+    public function distinct( bool $value = true ) : static {
+        $this->distinct = $value;
+
         return $this;
     }
 
@@ -207,6 +258,15 @@ class SelectionIntent implements QueryItentInterface{
      */
     public function get_bindings() : array {
         return $this->bindings;
+    }
+
+    /**
+     * Check distinct flag
+     * 
+     * @return bool
+     */
+    public function is_distinct() : bool {
+        return $this->distinct;
     }
 
     /**

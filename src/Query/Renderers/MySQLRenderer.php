@@ -41,40 +41,6 @@ class MySQLRenderer extends AbstractQueryRenderer {
     }
 
     /**
-     * Render a MySQL SELECT statement.
-     * 
-     * @param SelectionIntent $intent
-     * @return string
-     */
-    public function render_select( SelectionIntent $intent ) : string {
-        $sql = sprintf(
-            "SELECT %s FROM %s",
-            $this->render_columns( $intent->get_columns() ),
-            $this->quote_identifier( $intent->get_table_name() )
-        );
-
-        // 1. Joins
-        $sql .= $this->render_joins( $intent->get_joins() );
-
-        // 2. Where
-        $conditions = $intent->get_conditions();
-        if ( ! empty( $conditions ) ) {
-            $sql .= " WHERE " . $this->render_where_clauses( $conditions );
-        }
-
-        // 3. Group By
-        $sql .= $this->render_grouping( $intent->get_groups() );
-
-        // 4. Order By
-        $sql .= $this->render_ordering( $intent->get_orders() );
-
-        // 5. Limit & Offset
-        $sql .= $this->render_limit_offset( $intent->get_limit(), $intent->get_offset() );
-
-        return $sql . ";";
-    }
-
-    /**
      * Render CREATE TABLE.
      */
     public function render_create_table( CreateTableIntent $intent ) : string {

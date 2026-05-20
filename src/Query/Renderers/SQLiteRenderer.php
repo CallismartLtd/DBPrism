@@ -45,33 +45,6 @@ class SQLiteRenderer extends AbstractQueryRenderer {
     }
 
     /**
-     * Render a SQLite SELECT statement.
-     * 
-     * @param SelectionIntent $intent
-     * @return string
-     */
-    public function render_select( SelectionIntent $intent ) : string {
-        $sql = sprintf(
-            "SELECT %s FROM %s",
-            $this->render_columns( $intent->get_columns() ),
-            $this->quote_identifier( $intent->get_table_name() )
-        );
-
-        $sql .= $this->render_joins( $intent->get_joins() );
-
-        $conditions = $intent->get_conditions();
-        if ( ! empty( $conditions ) ) {
-            $sql .= " WHERE " . $this->render_where_clauses( $conditions );
-        }
-
-        $sql .= $this->render_grouping( $intent->get_groups() );
-        $sql .= $this->render_ordering( $intent->get_orders() );
-        $sql .= $this->render_limit_offset( $intent->get_limit(), $intent->get_offset() );
-
-        return $sql . ";";
-    }
-
-    /**
      * Render CREATE TABLE for SQLite.
      * 
      * @param CreateTableIntent $intent

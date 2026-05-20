@@ -118,7 +118,35 @@ abstract class AbstractQueryRenderer {
      * @param SelectionIntent $intent
      * @return string
      */
-    abstract public function render_select( SelectionIntent $intent ) : string;
+    public function render_select( SelectionIntent $intent ) : string {
+        $sql = "SELECT ";
+
+        if ( $intent->is_distinct() ) {
+            $sql .= "DISTINCT ";
+        }
+
+        $sql .= sprintf(
+            "%s FROM %s",
+            $this->render_columns( $intent->get_columns() ),
+            $this->quote_identifier( $intent->get_table_name() )
+        );
+
+        $sql .= $this->render_joins( $intent->get_joins() );
+
+        $conditions = $intent->get_conditions();
+
+        if ( ! empty( $conditions ) ) {
+            $sql .= " WHERE " . $this->render_where_clauses( $conditions );
+        }
+
+        $sql .= $this->render_grouping( $intent->get_groups() );
+
+        $sql .= $this->render_ordering( $intent->get_orders() );
+
+        $sql .= $this->render_limit_offset( $intent->get_limit(), $intent->get_offset() );
+
+        return $sql . ";";
+    }
 
     /**
      * Render an INSERT statement, supporting single or multiple rows.
@@ -208,7 +236,30 @@ abstract class AbstractQueryRenderer {
      * @return string
      */
     protected function render_columns( array $columns ) : string {
-        return implode( ', ', array_map( [ $this, 'quote_identifier' ], $columns ) );
+        $out = [];
+
+        foreach ( $columns as $col ) {
+
+            if ( $col['type'] === 'column' ) {
+                $sql = $this->quote_identifier( $col['value'] );
+            }
+
+            elseif ( $col['type'] === 'expression' ) {
+                $sql = $col['value'];
+            }
+
+            else {
+                $sql = $col['value']; // raw fallback
+            }
+
+            if (!empty($col['alias'])) {
+                $sql .= ' AS ' . $this->quote_identifier($col['alias']);
+            }
+
+            $out[] = $sql;
+        }
+
+        return implode(', ', $out);
     }
 
     /**
