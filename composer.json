@@ -21,9 +21,21 @@
     },
     "authors": [
         {
-            "name": "CallismartLtd",
+            "name": "Callistus Nwachukwu",
             "email": "admin@callismart.com.ng"
         }
     ],
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "archive": {
+        "exclude": [
+            "/tests",
+            "/phpunit.xml",
+            "/phpunit.xml.dist",
+            "/.github"
+        ]
+    },
+
+    "scripts": {
+        "test": "phpunit --colors=always --testdox"
+    }
 }
