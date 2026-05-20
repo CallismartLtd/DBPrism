@@ -3,12 +3,12 @@
  * Database Adapter interface file.
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL
+ * @package Callismart\DBPrism
  */
 
-namespace Callismart\DBAL\Adapters\Contracts;
+namespace Callismart\DBPrism\Adapters\Contracts;
 
-use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBPrism\DBConfigDTO;
 
 /**
  * Database adapter contracts.

@@ -3,10 +3,10 @@
  * PostgreSQL database inspector implementation
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Inspection\Providers
+ * @package Callismart\DBPrism\Inspection\Providers
  */
 
-namespace Callismart\DBAL\Inspection\Providers;
+namespace Callismart\DBPrism\Inspection\Providers;
 
 /**
  * Inspector for PostgreSQL databases.

@@ -3,15 +3,15 @@
  * Test functions API
  */
 
-namespace Callismart\DBAL\tests;
+namespace Callismart\DBPrism\tests;
 
-use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
-use Callismart\DBAL\Adapters\MysqliAdapter;
-use Callismart\DBAL\Adapters\PostgresAdapter;
-use Callismart\DBAL\Adapters\SqliteAdapter;
-use Callismart\DBAL\Database;
-use Callismart\DBAL\DBConfigDTO;
-use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Adapters\MysqliAdapter;
+use Callismart\DBPrism\Adapters\PostgresAdapter;
+use Callismart\DBPrism\Adapters\SqliteAdapter;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\DBConfigDTO;
+use Callismart\DBPrism\Query\SQLBuilder;
 use PHPUnit\Framework\InvalidDependencyException;
 
 /**

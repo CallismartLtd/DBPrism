@@ -3,19 +3,19 @@
  * Abstract Migration Base Class
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations;
+namespace Callismart\DBPrism\Migrations;
 
-use Callismart\DBAL\Database;
-use Callismart\DBAL\Inspection\Inspector;
-use Callismart\DBAL\Migrations\Helpers\ColumnHelper;
-use Callismart\DBAL\Migrations\Helpers\ConstraintHelper;
-use Callismart\DBAL\Migrations\Helpers\IndexHelper;
-use Callismart\DBAL\Migrations\Helpers\TableHelper;
-use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\Inspection\Inspector;
+use Callismart\DBPrism\Migrations\Helpers\ColumnHelper;
+use Callismart\DBPrism\Migrations\Helpers\ConstraintHelper;
+use Callismart\DBPrism\Migrations\Helpers\IndexHelper;
+use Callismart\DBPrism\Migrations\Helpers\TableHelper;
+use Callismart\DBPrism\Query\SQLBuilder;
 
 /**
  * Base class for all database migrations.
@@ -28,7 +28,7 @@ use Callismart\DBAL\Query\SQLBuilder;
 abstract class AbstractMigration implements MigrationInterface {
 
     /**
-     * The DBAL instance.
+     * The Database abstraction instance.
      *
      * @var Database
      */
@@ -202,7 +202,7 @@ abstract class AbstractMigration implements MigrationInterface {
     }
 
     /**
-     * Get the DBAL instance.
+     * Get the database bstraction instance.
      *
      * @return Database
      */

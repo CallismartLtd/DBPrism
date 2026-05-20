@@ -5,14 +5,14 @@
  * Implements the DatabaseAdapterInterface for WordPress environments
  * using the global $wpdb object.
  *
- * @package Callismart\DBAL\Adapters
+ * @package Callismart\DBPrism\Adapters
  */
 
-namespace Callismart\DBAL\Adapters;
+namespace Callismart\DBPrism\Adapters;
 
-use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBPrism\DBConfigDTO;
 use wpdb;
-use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for WordPress database access.

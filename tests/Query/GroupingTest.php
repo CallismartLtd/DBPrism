@@ -7,7 +7,7 @@ declare( strict_types=1 );
 
 use PHPUnit\Framework\TestCase;
 
-use function Callismart\DBAL\tests\{
+use function Callismart\DBPrism\tests\{
     queryBuilder,
     dbal
 };

@@ -3,11 +3,11 @@
 <phpunit bootstrap="tests/bootstrap.php" colors="true" >
     <testsuites>
 
-        <testsuite name="DBAL Intent Tests">
+        <testsuite name="DBPrism Intent Tests">
             <directory>tests/Query/Intent</directory>
         </testsuite>
 
-        <testsuite name="DBAL Renderer Tests">
+        <testsuite name="DBPrism Renderer Tests">
             <directory>tests/Query/Renderer</directory>
         </testsuite>
 

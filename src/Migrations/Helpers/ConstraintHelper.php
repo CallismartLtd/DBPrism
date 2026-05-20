@@ -3,16 +3,16 @@
  * Constraint Helper class file.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Helpers;
 
 use Exception;
-use Callismart\DBAL\Database;
-use Callismart\DBAL\Query\SQLBuilder;
-use Callismart\DBAL\Utils\Constraint;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Utils\Constraint;
 
 /**
  * Provides fluent interface for constraint operations.

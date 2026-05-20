@@ -2,15 +2,15 @@
 /**
  * TruncateTable Query Intent class file.
  * * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query\QueryIntents
+ * @package Callismart\DBPrism\Query\QueryIntents
  * @since 0.2.0
  * */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\QueryIntents;
 
-use Callismart\DBAL\Query\SQLBuilder;
-use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
 use Exception;
 
 /**

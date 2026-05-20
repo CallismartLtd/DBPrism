@@ -3,12 +3,12 @@
  * Default Database Column Value file.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Schema
+ * @package Callismart\DBPrism\Schema
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Utils;
+namespace Callismart\DBPrism\Utils;
 
 /**
  * The canonical data transfer object for default value of a database

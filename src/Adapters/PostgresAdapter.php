@@ -1,9 +1,9 @@
 <?php
-namespace Callismart\DBAL\Adapters;
+namespace Callismart\DBPrism\Adapters;
 
 use PDO;
 use PDOStatement;
-use Callismart\DBAL\PostgresCompatibilityTrait;
+use Callismart\DBPrism\PostgresCompatibilityTrait;
 
 /**
  * Postgres Adapter extending the generic PDO Adapter.

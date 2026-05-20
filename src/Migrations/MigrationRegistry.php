@@ -3,11 +3,11 @@
  * Migration Registry class file.
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations;
+namespace Callismart\DBPrism\Migrations;
 
 /**
  * Registry for discovering and managing migrations.
@@ -113,7 +113,7 @@ class MigrationRegistry {
         if ( preg_match( '/namespace\s+([^;]+);/', $content, $matches ) ) {
             return trim( $matches[1] );
         }
-        return 'Callismart\DBAL\Migrations';
+        return 'Callismart\DBPrism\Migrations';
     }
 
     /**

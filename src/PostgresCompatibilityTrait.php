@@ -1,5 +1,5 @@
 <?php
-namespace Callismart\DBAL;
+namespace Callismart\DBPrism;
 
 trait PostgresCompatibilityTrait {
     protected function translate_mysql_to_postgres(string $sql): string {

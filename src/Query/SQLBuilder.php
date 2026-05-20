@@ -3,22 +3,22 @@
  * SQL Query Builder - Intent Layer (Engine-Agnostic)
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query
+ * @package Callismart\DBPrism\Query
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Query;
+namespace Callismart\DBPrism\Query;
 
-use Callismart\DBAL\Query\QueryIntents\CreateTableIntent;
-use Callismart\DBAL\Query\QueryIntents\AlterTableIntent;
-use Callismart\DBAL\Query\QueryIntents\DeleteIntent;
-use Callismart\DBAL\Query\QueryIntents\PersistenceIntent;
-use Callismart\DBAL\Query\QueryIntents\SelectionIntent;
-use Callismart\DBAL\Query\QueryIntents\TruncateTableIntent;
-use Callismart\DBAL\Query\Renderers\AbstractQueryRenderer;
-use Callismart\DBAL\Query\Renderers\MySQLRenderer;
-use Callismart\DBAL\Query\Renderers\PostgreSQLRenderer;
-use Callismart\DBAL\Query\Renderers\SQLiteRenderer;
+use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
+use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
+use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
+use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBPrism\Query\Renderers\AbstractQueryRenderer;
+use Callismart\DBPrism\Query\Renderers\MySQLRenderer;
+use Callismart\DBPrism\Query\Renderers\PostgreSQLRenderer;
+use Callismart\DBPrism\Query\Renderers\SQLiteRenderer;
 
 /**
  * SQLBuilder - Intent Layer Only

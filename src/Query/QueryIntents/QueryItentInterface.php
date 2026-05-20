@@ -6,7 +6,7 @@
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\QueryIntents;
 
 interface QueryItentInterface {
     /**

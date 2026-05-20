@@ -3,11 +3,11 @@
  * Migration Runner
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations;
+namespace Callismart\DBPrism\Migrations;
 
 /**
  * Executes registered migrations.
@@ -36,7 +36,7 @@ class MigrationRunner {
     /**
      * Database adapter.
      *
-     * @var \Callismart\DBAL\Adapters\DatabaseAdapterInterface
+     * @var \Callismart\DBPrism\Adapters\DatabaseAdapterInterface
      */
     private $adapter;
 

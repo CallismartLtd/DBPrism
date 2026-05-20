@@ -5,10 +5,10 @@
 
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Tests\Query\Intent;
+namespace Callismart\DBPrism\Tests\Query\Intent;
 
 use PHPUnit\Framework\TestCase;
-use function Callismart\DBAL\tests\{
+use function Callismart\DBPrism\tests\{
     queryBuilder,
     dbal
 };

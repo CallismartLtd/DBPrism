@@ -3,14 +3,14 @@
  * Table Helper class file.
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Helpers;
 
-use Callismart\DBAL\Database;
-use Callismart\DBAL\Query\SQLBuilder;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\Query\SQLBuilder;
 
 /**
  * Table-level migration orchestrator.

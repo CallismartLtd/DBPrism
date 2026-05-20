@@ -1,5 +1,5 @@
 <?php
-namespace Callismart\DBAL\Query\Renderers;
+namespace Callismart\DBPrism\Query\Renderers;
 
 /**
  * MySQL Composite Renderer.
@@ -9,7 +9,7 @@ class MySQLCompositeRenderer implements CompositeRenderer {
     /**
      * Render UNION query.
      *
-     * @param \Callismart\DBAL\Query\SQLBuilder[] $queries
+     * @param \Callismart\DBPrism\Query\SQLBuilder[] $queries
      * @param string       $type
      * @param array        $intent
      *

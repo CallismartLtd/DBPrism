@@ -5,16 +5,16 @@
  * Supports UNION / UNION ALL composition of SQLBuilder queries.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query
+ * @package Callismart\DBPrism\Query
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Query;
+namespace Callismart\DBPrism\Query;
 
-use Callismart\DBAL\Query\Renderers\CompositeRenderer;
-use Callismart\DBAL\Query\Renderers\MySQLCompositeRenderer;
-use Callismart\DBAL\Query\Renderers\PostgreSQLCompositeRenderer;
-use Callismart\DBAL\Query\Renderers\SQLiteCompositeRenderer;
+use Callismart\DBPrism\Query\Renderers\CompositeRenderer;
+use Callismart\DBPrism\Query\Renderers\MySQLCompositeRenderer;
+use Callismart\DBPrism\Query\Renderers\PostgreSQLCompositeRenderer;
+use Callismart\DBPrism\Query\Renderers\SQLiteCompositeRenderer;
 
 /**
  * CompositeSQLBuilder

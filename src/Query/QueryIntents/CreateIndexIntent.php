@@ -3,13 +3,13 @@
  * Create Index Intent
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query\QueryIntents
+ * @package Callismart\DBPrism\Query\QueryIntents
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\QueryIntents;
 
-use Callismart\DBAL\Utils\Constraint;
+use Callismart\DBPrism\Utils\Constraint;
 
 /**
  * Represents the intent to create a standalone index on an existing table.

@@ -3,17 +3,17 @@
  * Schema Inspector for Table Introspection
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Inspection;
+namespace Callismart\DBPrism\Inspection;
 
-use Callismart\DBAL\Database;
-use Callismart\DBAL\Inspection\Contracts\InspectionInterface;
-use Callismart\DBAL\Inspection\Providers\MysqlInspector;
-use Callismart\DBAL\Inspection\Providers\PostgresInspector;
-use Callismart\DBAL\Inspection\Providers\SQLiteInspector;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\Inspection\Contracts\InspectionInterface;
+use Callismart\DBPrism\Inspection\Providers\MysqlInspector;
+use Callismart\DBPrism\Inspection\Providers\PostgresInspector;
+use Callismart\DBPrism\Inspection\Providers\SQLiteInspector;
 
 /**
  * Database Schema Inspection Facade

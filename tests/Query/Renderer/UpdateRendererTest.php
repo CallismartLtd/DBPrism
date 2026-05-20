@@ -5,11 +5,11 @@
 
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Tests\Query\Renderer;
+namespace Callismart\DBPrism\Tests\Query\Renderer;
 
 use PHPUnit\Framework\TestCase;
-use function Callismart\DBAL\tests\queryBuilder;
-use function Callismart\DBAL\tests\dbal;
+use function Callismart\DBPrism\tests\queryBuilder;
+use function Callismart\DBPrism\tests\dbal;
 
 final class UpdateRendererTest extends TestCase {
 

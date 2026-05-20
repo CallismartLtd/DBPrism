@@ -3,14 +3,14 @@
  * Abstract database inspector implementation
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Inspection\Providers
+ * @package Callismart\DBPrism\Inspection\Providers
  */
 
-namespace Callismart\DBAL\Inspection\Providers;
+namespace Callismart\DBPrism\Inspection\Providers;
 
-use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
-use Callismart\DBAL\Inspection\Contracts\InspectionInterface;
-use Callismart\DBAL\DBConfigDTO;
+use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Inspection\Contracts\InspectionInterface;
+use Callismart\DBPrism\DBConfigDTO;
 
 /**
  * Base inspector class with shared logic for all database engines.

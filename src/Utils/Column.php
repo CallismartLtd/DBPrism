@@ -3,12 +3,12 @@
  * Database Column class file.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Schema
+ * @package Callismart\DBPrism\Schema
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Utils;
+namespace Callismart\DBPrism\Utils;
 
 /**
  * Represents a single column in a database table schema.
@@ -24,7 +24,7 @@ class Column {
     public string $name;
 
     /** 
-     * @see \Callismart\DBAL\Utils\ColumnType
+     * @see \Callismart\DBPrism\Utils\ColumnType
      * @var int $type Column type.
      */
     public int $type;
@@ -93,7 +93,7 @@ class Column {
      * 
      * @param int $type
      * @return static
-     * @see \Callismart\DBAL\Utils\ColumnType
+     * @see \Callismart\DBPrism\Utils\ColumnType
      */
     public function type( int $type ) : static {
         $this->type = $type;

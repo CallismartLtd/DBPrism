@@ -3,14 +3,14 @@
  * Migration History for Tracking Executed Migrations
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations;
+namespace Callismart\DBPrism\Migrations;
 
-use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
-use Callismart\DBAL\Database;
+use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Database;
 
 /**
  * Tracks which migrations have been executed.
@@ -46,7 +46,7 @@ class MigrationHistory {
     /**
      * Constructor.
      *
-     * @param \Callismart\DBAL\Adapters\DatabaseAdapterInterface $adapter The database adapter
+     * @param \Callismart\DBPrism\Adapters\DatabaseAdapterInterface $adapter The database adapter
      */
     public function __construct( Database $database ) {
         $this->executor = $database;

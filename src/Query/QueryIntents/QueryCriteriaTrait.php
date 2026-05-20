@@ -3,12 +3,12 @@
  * Query Criteria Trait file.
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query\Traits
+ * @package Callismart\DBPrism\Query\Traits
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\QueryIntents;
 
 /**
  * Provides fluent methods for building query conditions and managing bindings.

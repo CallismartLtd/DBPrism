@@ -5,11 +5,11 @@
 
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Tests\Query\Intent;
+namespace Callismart\DBPrism\Tests\Query\Intent;
 
 use PHPUnit\Framework\TestCase;
-use function Callismart\DBAL\tests\queryBuilder;
-use function Callismart\DBAL\tests\dbal;
+use function Callismart\DBPrism\tests\queryBuilder;
+use function Callismart\DBPrism\tests\dbal;
 
 final class SelectionIntentTest extends TestCase {
 

@@ -1,28 +1,44 @@
 {
-    "name": "callismart/dbal",
-    "description": "Engine agnostic database abstraction layer. Supports MYSQL, PostgreSQL and SQLite.",
+    "name": "callismart/dbprism",
+    "description": "DBPrism: Intent-based database abstraction layer with unified adapters, schema inspection, and migrations. Supports MySQL, PostgreSQL, SQLite, PDO, and WordPress.",
     "type": "library",
+    "keywords": [
+        "database",
+        "dbal",
+        "abstraction",
+        "query-builder",
+        "migrations",
+        "schema",
+        "mysql",
+        "postgresql",
+        "sqlite",
+        "pdo",
+        "wordpress"
+    ],
+    "homepage": "https://github.com/callismart/dbprism",
+    "license": "MIT",
     "require": {
+        "php": "^8.1",
         "callismart/dto": "^1.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^13.1"
     },
-    "license": "MIT",
     "autoload": {
         "psr-4": {
-            "Callismart\\Dbal\\": "src/"
+            "Callismart\\DBPrism\\": "src/"
         }
     },
     "autoload-dev": {
-        "files" : [
+        "files": [
             "tests/Functions.php"
         ]
     },
     "authors": [
         {
             "name": "Callistus Nwachukwu",
-            "email": "admin@callismart.com.ng"
+            "email": "admin@callismart.com.ng",
+            "homepage": "https://github.com/CallismartLtd/dbprism"
         }
     ],
     "minimum-stability": "stable",
@@ -31,10 +47,10 @@
             "/tests",
             "/phpunit.xml",
             "/phpunit.xml.dist",
-            "/.github"
+            "/.github",
+            "/README.md"
         ]
     },
-
     "scripts": {
         "test": "phpunit --colors=always --testdox"
     }

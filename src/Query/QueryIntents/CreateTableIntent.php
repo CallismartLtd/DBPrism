@@ -3,18 +3,18 @@
  * CreateTable Query Intent class file.
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query\QueryIntents
+ * @package Callismart\DBPrism\Query\QueryIntents
  * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBAL\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\QueryIntents;
 
-use Callismart\DBAL\Query\SQLBuilder;
-use Callismart\DBAL\Query\SQLBuilderStrategyTrait;
-use Callismart\DBAL\Utils\Column;
-use Callismart\DBAL\Utils\Constraint;
-use Callismart\DBAL\Utils\Table;
+use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\Constraint;
+use Callismart\DBPrism\Utils\Table;
 use Exception;
 
 /**

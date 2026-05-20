@@ -1,5 +1,5 @@
 <?php
-namespace Callismart\DBAL;
+namespace Callismart\DBPrism;
 
 trait SqliteCompatibilityTrait {
 

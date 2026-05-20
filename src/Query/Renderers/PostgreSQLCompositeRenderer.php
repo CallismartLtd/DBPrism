@@ -1,5 +1,5 @@
 <?php
-namespace Callismart\DBAL\Query\Renderers;
+namespace Callismart\DBPrism\Query\Renderers;
 
 /**
  * PostgreSQL Composite Renderer.

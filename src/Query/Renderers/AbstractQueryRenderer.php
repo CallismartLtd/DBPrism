@@ -3,22 +3,22 @@
  * Abstract Query Renderer - Abstract Base Class
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Query\Renderers
+ * @package Callismart\DBPrism\Query\Renderers
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Query\Renderers;
+namespace Callismart\DBPrism\Query\Renderers;
 
-use Callismart\DBAL\Query\QueryIntents\AlterTableIntent;
-use Callismart\DBAL\Query\QueryIntents\CreateIndexIntent;
-use Callismart\DBAL\Query\QueryIntents\CreateTableIntent;
-use Callismart\DBAL\Query\QueryIntents\DeleteIntent;
-use Callismart\DBAL\Query\QueryIntents\PersistenceIntent;
-use Callismart\DBAL\Query\QueryIntents\SelectionIntent;
-use Callismart\DBAL\Query\QueryIntents\TruncateTableIntent;
-use Callismart\DBAL\Utils\Constraint;
-use Callismart\DBAL\Utils\ColumnType;
-use Callismart\DBAL\Utils\DefaultColumnValue;
+use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\CreateIndexIntent;
+use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
+use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
+use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
+use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBPrism\Utils\Constraint;
+use Callismart\DBPrism\Utils\ColumnType;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
 
 /**
  * Provides a blueprint for engine-specific SQL renderers.

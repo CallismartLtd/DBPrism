@@ -3,11 +3,11 @@
  * Migration Interface
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations;
+namespace Callismart\DBPrism\Migrations;
 
 /**
  * Interface that all database migrations must implement.

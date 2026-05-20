@@ -4,15 +4,15 @@
  *
  * Implements the DatabaseAdapterInterface for environments using the mysqli extension.
  *
- * @package Callismart\DBAL\Adapters
+ * @package Callismart\DBPrism\Adapters
  */
 
-namespace Callismart\DBAL\Adapters;
+namespace Callismart\DBPrism\Adapters;
 
 use mysqli;
 use mysqli_stmt;
-use Callismart\DBAL\DBConfigDTO;
-use Callismart\DBAL\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\DBConfigDTO;
+use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
 
 /**
  * Adapter for MySQLi database access.

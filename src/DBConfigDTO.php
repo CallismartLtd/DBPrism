@@ -8,7 +8,7 @@
 
 declare( strict_types = 1 );
 
-namespace Callismart\DBAL;
+namespace Callismart\DBPrism;
 
 use LogicException;
 use Callismart\DTO\DTO;

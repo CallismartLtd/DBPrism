@@ -3,16 +3,16 @@
  * Column Helper for Fluent Column Operations
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL\Migrations
+ * @package Callismart\DBPrism\Migrations
  * @since 0.2.0
  */
 
-namespace Callismart\DBAL\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Helpers;
 
-use Callismart\DBAL\Database;
-use Callismart\DBAL\Query\SQLBuilder;
-use Callismart\DBAL\Utils\Column;
-use Callismart\DBAL\Utils\Constraint;
+use Callismart\DBPrism\Database;
+use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\Constraint;
 
 /**
  * Column migration orchestrator.
@@ -41,7 +41,7 @@ class ColumnHelper {
 	 * 
 	 * @param string|Column $column The new column name.
 	 * @param array{
-     *     type: int, // @see \Callismart\DBAL\Utils\ColumnType
+     *     type: int, // @see \Callismart\DBPrism\Utils\ColumnType
      *     length?: int|null,
      *     precision?: int|null,
      *     scale?: int|null,
@@ -196,7 +196,7 @@ class ColumnHelper {
 	 * Change column type.
 	 * 
 	 * @param string $column The column name.
-	 * @param int $type The column type @see \Callismart\DBAL\Utils\ColumnType constants
+	 * @param int $type The column type @see \Callismart\DBPrism\Utils\ColumnType constants
 	 */
 	public function changeType( string $column, int $type ) : static {
 

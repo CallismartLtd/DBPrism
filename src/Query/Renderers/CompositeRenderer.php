@@ -1,5 +1,5 @@
 <?php
-namespace Callismart\DBAL\Query\Renderers;
+namespace Callismart\DBPrism\Query\Renderers;
 
 /**
  * Composite Renderer Contract.
@@ -9,7 +9,7 @@ interface CompositeRenderer {
     /**
      * Render UNION / UNION ALL query.
      *
-     * @param \Callismart\DBAL\Query\SQLBuilder[] $queries
+     * @param \Callismart\DBPrism\Query\SQLBuilder[] $queries
      * @param string       $type
      * @param array        $intent
      *

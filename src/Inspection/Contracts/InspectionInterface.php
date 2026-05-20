@@ -3,10 +3,10 @@
  * Database schema inspection interface file
  * 
  * @author Callistus Nwachukwu
- * @package Callismart\DBAL
+ * @package Callismart\DBPrism
  */
 
-namespace Callismart\DBAL\Inspection\Contracts;
+namespace Callismart\DBPrism\Inspection\Contracts;
 
 /**
  * Contracts for database inspection engines.
