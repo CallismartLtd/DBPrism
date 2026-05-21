@@ -78,6 +78,11 @@ class SelectionIntent implements QueryItentInterface{
      * @return static
      */
     public function select( string ...$columns ) : static {
+        
+        if ( empty( $column ) ) {
+            $columns = ['*'];
+        }
+
         foreach ( $columns as $column ) {
             $this->columns[] = $this->normalize_column( $column );
         }
