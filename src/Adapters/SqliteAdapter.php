@@ -120,7 +120,12 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return void
      */
     public function begin_transaction() : void {
-        $this->sqlite->exec( 'BEGIN TRANSACTION' );
+        if ( $this->ensure_connection() ) {
+            // 'BEGIN IMMEDIATE' locks the database file 
+            // against concurrent writers right now until busy timesout
+            // period elapses.
+            $this->sqlite->exec( 'BEGIN IMMEDIATE TRANSACTION;' );
+        }
     }
 
     /**

@@ -63,6 +63,12 @@ class Database {
     protected DatabaseAdapterInterface $adapter;
 
     /**
+     * Track active transaction nesting level depth.
+     * Prevents nested code modules from firing false commits/rollbacks.
+     */
+    protected int $transaction_depth = 0;
+
+    /**
      * Class constructor.
      *
      * @param DatabaseAdapterInterface $adapter Database adapter instance.
@@ -97,27 +103,49 @@ class Database {
         throw new \ErrorException( $message, 0, 1, $file, $line );
     }
 
-    /**
-     * Execute a set of queries within a transaction block.
+/**
+     * Execute a set of queries within a transaction block securely.
+     *
+     * Handles nested calls gracefully using counter gates.
      *
      * @param callable $callback A function containing the database logic.
-     * @return mixed Returns the result of the callback on success, or throws Exception on fail.
+     * @return mixed Returns the result of the callback on success.
      * @throws \Throwable
      */
     public function transactional( callable $callback ) : mixed {
-        $result = null;
-        try {
-            $this->begin_transaction();
-            $result = $callback();
+        $this->transaction_depth++;
 
-            $this->commit();
-            
-        } catch( \Throwable $th ) {
-            $this->rollback();
-            throw $th;
+        // Only tell the driver adapter to fire a real block
+        // start for the top-level request.
+        if ( 1 === $this->transaction_depth ) {
+            $this->begin_transaction(); 
+            // Note: If this is your SQLiteAdapter,
+            // it runs 'BEGIN IMMEDIATE TRANSACTION' internally.
         }
 
-        return $result;
+        try {
+            $result = $callback( $this );
+
+            $this->transaction_depth--;
+            
+            // Only finalize and commit if we are exiting
+            // the absolute outermost block safely.
+            if ( 0 === $this->transaction_depth ) {
+                $this->commit();
+            }
+
+            return $result;
+
+        } catch ( \Throwable $th ) {
+            // If any nested point breaks, force a hard rollback,
+            // reset tracking, and bubbles up.
+            if ( $this->transaction_depth > 0 ) {
+                $this->rollback();
+                $this->transaction_depth = 0;
+            }
+
+            throw $th;
+        }
     }
 
     /**
@@ -213,5 +241,16 @@ class Database {
      */
     public function get_adapter() : DatabaseAdapterInterface {
         return $this->adapter;
+    }
+
+    /**
+     * Retrieve the appropriate lock syntax suffix string based on the active driver.
+     *
+     * Saves repository layers from writing engine switches.
+     *
+     * @return string Suffix code syntax like ' FOR UPDATE' or an empty string.
+     */
+    public function lock_suffix() : string {
+        return 'sqlite' === $this->get_driver() ? '' : ' FOR UPDATE';
     }
 }
