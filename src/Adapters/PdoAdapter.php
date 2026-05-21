@@ -15,6 +15,7 @@ use PDOException;
 use PDOStatement;
 use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Utils\SQLStatementSplitter;
 
 /**
  * Adapter for PDO database access.
@@ -48,6 +49,13 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * @var string|null
      */
     protected ?string $last_error = null;
+
+    /**
+     * SQL query splitter instance.
+     *
+     * @var SQLStatementSplitter|null
+     */
+    protected ?SQLStatementSplitter $splitter = null;
 
     /**
      * Constructor.
@@ -326,6 +334,11 @@ class PdoAdapter implements DatabaseAdapterInterface {
         try {
             $stmt = $this->pdo->prepare( $query );
 
+            if ( ! $stmt ) {
+                $this->last_error   = $this->pdo->errorInfo()[2] ?? sprintf( '%s prepare statement failed.', static::class );
+                return false;
+            }
+
             if ( ! empty( $params ) ) {
                 foreach ( $params as $i => $param ) {
                     $type = $this->get_param_type( $param );
@@ -590,16 +603,31 @@ class PdoAdapter implements DatabaseAdapterInterface {
     /**
      * {@inheritdoc}
      */
-    public function exec( string $query ) : bool {
+    public function exec( string $query ): bool {
         if ( ! $this->ensure_connection() ) {
             return false;
         }
-
+    
         try {
-            
-            $result = $this->pdo->exec( $query );
-            return false !== $result;
-
+            // Parse the query string into individual statements
+            $splitter = $this->get_parser();
+            $queries = $splitter->split( $query );
+    
+            if ( empty( $queries ) ) {
+                return true; // Empty input is not an error
+            }
+    
+            // Execute each statement
+            foreach ( $queries as $stmt ) {
+                $result = $this->pdo->exec( $stmt );
+                if ( false === $result ) {
+                    $this->last_error = 'PDO exec failed for statement: ' . substr( $stmt, 0, 50 );
+                    return false;
+                }
+            }
+    
+            return true;
+    
         } catch ( \PDOException $e ) {
             $this->last_error = $e->getMessage();
             return false;
@@ -629,5 +657,17 @@ class PdoAdapter implements DatabaseAdapterInterface {
      */
     public function is_connected(): bool {
         return isset( $this->pdo ) && $this->pdo instanceof \PDO;
+    }
+
+    /**
+     * Get or instantiate the SQL query parser.
+     *
+     * @return SQLStatementSplitter
+     */
+    protected function get_parser(): SQLStatementSplitter {
+        if ( $this->splitter === null ) {
+            $this->splitter = new SQLStatementSplitter();
+        }
+        return $this->splitter;
     }
 }

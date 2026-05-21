@@ -11,5 +11,9 @@
             <directory>tests/Query/Renderer</directory>
         </testsuite>
 
+        <testsuite name="DBPrism Utils Tests">
+            <directory>tests/Utils</directory>
+        </testsuite>
+        
     </testsuites>
 </phpunit>

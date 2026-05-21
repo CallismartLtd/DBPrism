@@ -79,7 +79,7 @@ class SelectionIntent implements QueryItentInterface{
      */
     public function select( string ...$columns ) : static {
         
-        if ( empty( $column ) ) {
+        if ( empty( $columns ) ) {
             $columns = ['*'];
         }
 

@@ -73,11 +73,13 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return bool True on success, false on failure.
      */
     protected function connect() {
-        if ( $this->sqlite ) {
+        if ( $this->is_connected() ) {
             return true;
         }
 
         try {
+            $this->last_error = null;
+
             $path       = $this->config->path;
             $dbname     = $this->config->dbname;
             $filename   = "$path/$dbname.db";
@@ -152,32 +154,42 @@ class SqliteAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        $query  = $this->translate_mysql_to_sqlite( $query );
-        $stmt   = @$this->sqlite->prepare( $query );
-        if ( ! $stmt ) {
-            $this->last_error = $this->sqlite->lastErrorMsg();
-            return false;
-        }
+        try {
 
-        if ( ! empty( $params ) ) {
-            foreach ( $params as $i => $value ) {
-                $stmt->bindValue( $i + 1, $value, $this->get_type( $value ) );
+            $query  = $this->translate_mysql_to_sqlite( $query );
+            $stmt   = $this->sqlite->prepare( $query );
+
+            if ( ! $stmt ) {
+                $this->last_error = $this->sqlite->lastErrorMsg();
+                return false;
             }
-        }
 
-        $result = $stmt->execute();
-        
-        if ( ! $result ) {
-            $this->last_error = $this->sqlite->lastErrorMsg();
+            if ( ! empty( $params ) ) {
+                foreach ( $params as $i => $value ) {
+                    $stmt->bindValue( $i + 1, $value, $this->get_type( $value ) );
+                }
+            }
+
+            $result = $stmt->execute();
+            
+            if ( ! $result ) {
+                $this->last_error = $this->sqlite->lastErrorMsg();
+                $stmt->close();
+                return false;
+            }
+
+            // Store insert ID if this was an INSERT operation.
+            if ( preg_match( '/^\s*INSERT\s+/i', $query ) ) {
+                $this->insert_id = $this->sqlite->lastInsertRowID();
+            }
+
+            $stmt->close();
+
+            return $result;
+        } catch ( \Exception $e ) {
+            $this->last_error   = $e->getMessage();
             return false;
         }
-
-        // Store insert ID if this was an INSERT operation.
-        if ( stripos( trim( $query ), 'INSERT' ) === 0 ) {
-            $this->insert_id = $this->sqlite->lastInsertRowID();
-        }
-
-        return $result;
     }
 
     /**
@@ -203,6 +215,8 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return array|null Associative array of the row, or null if not found.
      */
     public function get_row( $query, array $params = [] ) : ?array {
+        $this->last_error = null;
+
         $result = $this->query( $query, $params );
         if ( ! $result ) return null;
         
@@ -218,6 +232,9 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return array List of associative arrays.
      */
     public function get_results( $query, array $params = [] ) : array {
+
+        $this->last_error = null;
+
         $result = $this->query( $query, $params );
         if ( ! $result ) return [];
 
@@ -236,6 +253,8 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return mixed|null The first column of the first row, or null if none.
      */
     public function get_var( $query, array $params = [] ) : mixed {
+        $this->last_error = null;
+
         $result = $this->query( $query, $params );
         if ( ! $result ) return null;
 
@@ -251,6 +270,12 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return array List of column values.
      */
     public function get_col( $query, array $params = [] ) : array {
+        if ( ! $this->ensure_connection() ) {
+            return [];
+        }
+
+        $this->last_error = null;
+
         $result = $this->query( $query, $params );
         if ( ! $result ) return [];
 
@@ -269,6 +294,12 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false The inserted record ID on success, false on failure.
      */
     public function insert( $table, array $data ) : int|false {
+        if ( ! $this->ensure_connection() ) {
+            return false;
+        }
+
+        $this->last_error = null;
+
         $columns = array_keys( $data );
         $placeholders = array_fill( 0, count( $data ), '?' );
 
@@ -292,8 +323,14 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false Number of affected rows, or false on failure.
      */
     public function update( $table, array $data, array $where ) : int|false {
-        $set_clauses = array_map( fn($col) => "$col = ?", array_keys( $data ) );
-        $where_clauses = array_map( fn($col) => "$col = ?", array_keys( $where ) );
+        if ( ! $this->ensure_connection() ) {
+            return false;
+        }
+
+        $this->last_error = null;
+
+        $set_clauses    = array_map( fn($col) => "$col = ?", array_keys( $data ) );
+        $where_clauses  = array_map( fn($col) => "$col = ?", array_keys( $where ) );
 
         $query = sprintf(
             'UPDATE %s SET %s WHERE %s',
@@ -316,6 +353,12 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false Number of affected rows, or false on failure.
      */
     public function delete( $table, array $where ) : int|false {
+        if ( ! $this->ensure_connection() ) {
+            return false;
+        }
+
+        $this->last_error = null;
+
         $where_clauses = array_map( fn($col) => "$col = ?", array_keys( $where ) );
 
         $query = sprintf(
@@ -368,23 +411,21 @@ class SqliteAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
+        $this->last_error = null;
+
         try {
             $query = $this->translate_mysql_to_sqlite( $query );
 
-            /**
-             * SQLite returns:
-             * - result set object for SELECT-like queries
-             * - TRUE/FALSE for exec()
-             */
-
-            $result = @$this->sqlite->exec( $query );
+            $result = $this->sqlite->exec( $query );
 
             if ( false === $result ) {
                 $this->last_error = $this->sqlite->lastErrorMsg();
                 return false;
             }
 
-            $this->insert_id    = $this->sqlite->lastInsertRowID();
+            if ( stripos( ltrim( $query ), 'INSERT' ) === 0 ) {
+                $this->insert_id = $this->sqlite->lastInsertRowID();
+            }
 
             return true;
 
@@ -428,7 +469,7 @@ class SqliteAdapter implements DatabaseAdapterInterface {
 
         $this->connect();
 
-        if ( ! $this->sqlite ) {
+        if ( ! $this->is_connected() ) {
             $this->last_error = 'No active SQLite3 connection.';
             return false;
         }

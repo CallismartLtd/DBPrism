@@ -61,11 +61,12 @@ interface DatabaseAdapterInterface {
      * - schema inspection (SHOW / DESCRIBE)
      * - migrations / admin tooling
      * - engine-specific queries
+     * - Multi query execution.
      *
      * @param string $query
      * @return bool
      */
-    public function exec(string $query) : bool;
+    public function exec( string $query ) : bool;
 
     /**
      * Retrieve a single row as an associative array.

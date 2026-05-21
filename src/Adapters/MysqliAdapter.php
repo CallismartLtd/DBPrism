@@ -520,25 +520,20 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        $result = $this->mysqli->query( $query );
+        $result = $this->mysqli->multi_query( $query );
 
         if ( false === $result ) {
             $this->last_error = $this->mysqli->error;
             return false;
         }
 
-        /**
-         * CASE 1: SELECT / SHOW / DESCRIBE (result set)
-         */
-        if ( $result instanceof \mysqli_result ) {
-            $this->insert_id    = (int) $this->mysqli->insert_id;
-            return true;
-        }
+        do {
+            if ( $res = $this->mysqli->store_result() ) {
+                $res->free();
+            }
+        } while ( $this->mysqli->more_results() && $this->mysqli->next_result() );
 
-        /**
-         * CASE 2: INSERT / UPDATE / DELETE / DDL
-         */
-        return (bool) $result;
+        return true;
     }
 
     /**
