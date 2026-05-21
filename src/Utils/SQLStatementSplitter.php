@@ -1,5 +1,14 @@
 <?php
 /**
+ * SQL Statement splitter class file
+ * 
+ * @author Callistus Nwachukwu
+ * @package Callismart\DBPrism
+ */
+declare( strict_types=1 );
+
+namespace Callismart\DBPrism\Utils;
+/**
  * SQL Query Splitter
  *
  * Parses multi-statement SQL strings safely across SQL dialects.
@@ -7,34 +16,30 @@
  * @package Callismart\DBPrism\Utilities
  */
 
-declare(strict_types=1);
-
-namespace Callismart\DBPrism\Utils;
-
 class SQLStatementSplitter {
 
 	public function split( string $sql ): array {
-		$queries = [];
-		$current = '';
+		$queries			= [];
+		$current			= '';
 
-		$in_string = false;
-		$string_char = '';
+		$in_string			= false;
+		$string_char		= '';
 
-		$in_line_comment = false;
-		$in_block_comment = false;
+		$in_line_comment	= false;
+		$in_block_comment	= false;
 
-		$length = strlen( $sql );
+		$length				= strlen( $sql );
 
 		for ( $i = 0; $i < $length; $i++ ) {
 
 			$char = $sql[$i];
 			$next = $i + 1 < $length ? $sql[$i + 1] : '';
 
-			/**
-			 * =========================================================
-			 * LINE COMMENT HANDLING
-			 * =========================================================
-			 */
+			/*
+			|--------------------------
+			| LINE COMMENT HANDLING
+			|--------------------------
+			*/
 			if ( $in_line_comment ) {
 
 				if ( $char === "\r" && $next === "\n" ) {
@@ -50,11 +55,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * BLOCK COMMENT HANDLING
-			 * =========================================================
-			 */
+			/*
+			|--------------------------
+			| BLOCK COMMENT HANDLING
+			|--------------------------
+			*/
 			if ( $in_block_comment ) {
 
 				if ( $char === '*' && $next === '/' ) {
@@ -65,11 +70,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * STRING HANDLING
-			 * =========================================================
-			 */
+			/*
+			|------------------
+			| STRING HANDLING
+			|------------------
+			*/
 			if ( $in_string ) {
 
 				$current .= $char;
@@ -98,11 +103,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * START COMMENTS
-			 * =========================================================
-			 */
+			/*
+			|-----------------
+			| START COMMENTS
+			|-----------------
+			*/
 			if ( $char === '-' && $next === '-' ) {
 				$in_line_comment = true;
 				$i++;
@@ -120,11 +125,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * STRING START
-			 * =========================================================
-			 */
+			/*
+			|--------------------------
+			| STRING START
+			|--------------------------
+			*/
 			if ( $char === "'" || $char === '"' || $char === '`' ) {
 				$in_string = true;
 				$string_char = $char;
@@ -132,11 +137,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * STATEMENT TERMINATOR
-			 * =========================================================
-			 */
+			/*
+			|--------------------------
+			| STATEMENT TERMINATOR
+			|--------------------------
+			*/
 			if ( $char === ';' ) {
 
 				$trimmed = trim( $current );
@@ -149,11 +154,11 @@ class SQLStatementSplitter {
 				continue;
 			}
 
-			/**
-			 * =========================================================
-			 * CORE FIX: IGNORE LEADING WHITESPACE CLEANLY
-			 * =========================================================
-			 */
+			/*
+			|-----------------------------------------------
+			| CORE FIX: IGNORE LEADING WHITESPACE CLEANLY
+			|-----------------------------------------------
+			*/
 			if ( $current === '' && ctype_space( $char ) ) {
 				continue;
 			}
