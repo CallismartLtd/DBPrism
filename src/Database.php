@@ -242,15 +242,4 @@ class Database {
     public function get_adapter() : DatabaseAdapterInterface {
         return $this->adapter;
     }
-
-    /**
-     * Retrieve the appropriate lock syntax suffix string based on the active driver.
-     *
-     * Saves repository layers from writing engine switches.
-     *
-     * @return string Suffix code syntax like ' FOR UPDATE' or an empty string.
-     */
-    public function lock_suffix() : string {
-        return 'sqlite' === $this->get_driver() ? '' : ' FOR UPDATE';
-    }
 }

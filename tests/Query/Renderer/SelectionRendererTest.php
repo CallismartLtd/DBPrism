@@ -182,4 +182,64 @@ final class SelectionRendererTest extends TestCase {
             $query->build()
         );
     }
+
+    public function test_pessimistic_write_lock_mode() : void {
+
+        $query = queryBuilder()
+            ->select('*')
+            ->from('calldbal_licenses')
+            ->where('id', '=', 1)
+            ->lock_for_update();
+
+        $suffix = match ( $this->engine() ) {
+            'mysql', 'pgsql' => ' FOR UPDATE',
+            'sqlite'         => '',
+            default          => '',
+        };
+
+        $this->assertSame(
+            "SELECT * FROM {$this->quote('calldbal_licenses')} WHERE {$this->quote('id')} = ?{$suffix};",
+            $query->build()
+        );
+    }
+
+    public function test_pessimistic_read_lock_mode() : void {
+
+        $query = queryBuilder()
+            ->select('*')
+            ->from('calldbal_licenses')
+            ->where('id', '=', 1)
+            ->shared_lock();
+
+        $suffix = match ( $this->engine() ) {
+            'mysql', 'pgsql' => ' FOR SHARE',
+            'sqlite'         => '',
+            default          => '',
+        };
+
+        $this->assertSame(
+            "SELECT * FROM {$this->quote('calldbal_licenses')} WHERE {$this->quote('id')} = ?{$suffix};",
+            $query->build()
+        );
+    }
+
+    public function test_lock_mode_with_nowait_modifier() : void {
+
+        $query = queryBuilder()
+            ->select('*')
+            ->from('calldbal_licenses')
+            ->where('id', '=', 1)
+            ->lock_no_wait();
+
+        $suffix = match ( $this->engine() ) {
+            'mysql', 'pgsql' => ' FOR UPDATE NOWAIT',
+            'sqlite'         => '',
+            default          => '',
+        };
+
+        $this->assertSame(
+            "SELECT * FROM {$this->quote('calldbal_licenses')} WHERE {$this->quote('id')} = ?{$suffix};",
+            $query->build()
+        );
+    }
 }
