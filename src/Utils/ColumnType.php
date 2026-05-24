@@ -3,7 +3,7 @@
  * Database Column Type class file.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBPrism\Schema
+ * @package Callismart\DBPrism
  * @since 0.2.0
  */
 declare( strict_types=1 );

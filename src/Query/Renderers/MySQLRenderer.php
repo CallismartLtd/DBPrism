@@ -16,6 +16,7 @@ use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\LockMode;
 
 /**
  * MySQL Query Renderer.
@@ -238,6 +239,19 @@ class MySQLRenderer extends AbstractQueryRenderer {
         }
 
         return $sql;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function render_lock_mode( LockMode $mode ) : string {
+        return match($mode) {
+            LockMode::SHARED      => ' FOR SHARE',
+            LockMode::EXCLUSIVE   => ' FOR UPDATE',
+            LockMode::NO_WAIT     => ' FOR UPDATE NOWAIT',
+            LockMode::SKIP_LOCKED => ' FOR UPDATE SKIP LOCKED',
+            default               => '',
+        };
     }
 
     /**

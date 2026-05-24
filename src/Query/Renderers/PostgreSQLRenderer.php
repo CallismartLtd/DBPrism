@@ -16,6 +16,7 @@ use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\LockMode;
 
 /**
  * PostgreSQL-specific SQL renderer.
@@ -277,6 +278,19 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         if ( $constraint->on_update ) $sql .= " ON UPDATE " . strtoupper( $constraint->on_update );
 
         return $sql;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function render_lock_mode( LockMode $mode ) : string {
+        return match($mode) {
+            LockMode::SHARED      => ' FOR SHARE',
+            LockMode::EXCLUSIVE   => ' FOR UPDATE',
+            LockMode::NO_WAIT     => ' FOR UPDATE NOWAIT',
+            LockMode::SKIP_LOCKED => ' FOR UPDATE SKIP LOCKED',
+            default               => '',
+        };
     }
 
     /**

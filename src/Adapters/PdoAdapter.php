@@ -543,7 +543,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
             $this->last_error = 'Delete WHERE condition cannot be empty.';
             return false;
         }
-
+ 
         // Build WHERE clause with ? placeholders
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";

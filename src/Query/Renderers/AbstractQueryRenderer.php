@@ -19,6 +19,7 @@ use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\ColumnType;
 use Callismart\DBPrism\Utils\DefaultColumnValue;
+use Callismart\DBPrism\Utils\LockMode;
 
 /**
  * Provides a blueprint for engine-specific SQL renderers.
@@ -47,10 +48,17 @@ abstract class AbstractQueryRenderer {
      */
     abstract protected function supports_native_booleans() : bool;
 
+    /**
+     * Render lock mode string
+     * 
+     * @param LockMode $mode
+     */
+    abstract protected function render_lock_mode( LockMode $mode ) : string;
+
     /*
-    |--------------------------------------------------------------------------
+    |--------------------------
     | Schema Rendering (DDL)
-    |--------------------------------------------------------------------------
+    |--------------------------
     */
 
     /**
@@ -144,6 +152,8 @@ abstract class AbstractQueryRenderer {
         $sql .= $this->render_ordering( $intent->get_orders() );
 
         $sql .= $this->render_limit_offset( $intent->get_limit(), $intent->get_offset() );
+
+        $sql .= $this->render_lock_mode( $intent->get_lock_mode() );
 
         return $sql . ";";
     }

@@ -16,6 +16,7 @@ use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\LockMode;
 
 /**
  * SQLite-specific SQL renderer.
@@ -266,6 +267,16 @@ class SQLiteRenderer extends AbstractQueryRenderer {
         if ( $constraint->on_update ) $sql .= " ON UPDATE " . strtoupper( $constraint->on_update );
 
         return $sql;
+    }
+
+    /**
+     * {@inheritdoc}
+     * 
+     * SQLite doesn't support SELECT ... FOR UPDATE syntax.
+     * @return string An empty string to avoid syntax crashes.
+     */
+    protected function render_lock_mode( LockMode $mode ) : string {
+        return '';
     }
 
     /**

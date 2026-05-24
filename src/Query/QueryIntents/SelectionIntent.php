@@ -12,6 +12,7 @@ namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
 use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Utils\LockMode;
 
 /**
  * Represents an intent to select data from the database.
@@ -65,6 +66,13 @@ class SelectionIntent implements QueryItentInterface{
     protected bool $distinct = false;
 
     /**
+     * Query lock mode.
+     * 
+     * @var LockMode
+     */
+    protected LockMode $lockMode    = LockMode::NONE;
+
+    /**
      * Private constructor to enforce static factory usage.
      */
     private function __construct( SQLBuilder $builder ) {
@@ -91,12 +99,14 @@ class SelectionIntent implements QueryItentInterface{
     }
 
     /**
-     * Normalize columns
+     * Normalize columns and expressions, extracting aliases when present.
      * 
      * @param string $column
      * @return array
      */
     protected function normalize_column( string $column ) : array {
+        $column = trim( $column );
+
         if ( '*' === $column || '' === $column ) {
             return [
                 'type'  => 'column',
@@ -104,22 +114,36 @@ class SelectionIntent implements QueryItentInterface{
             ];
         }
 
-        if ( preg_match('/\w+\s*\(.*\)/', $column ) ) {
-            return ['type' => 'expression', 'value' => $column];
-        }
+        // Match: [Anything] followed optionally by (whitespace + optional 'AS' + whitespace) and an [Alias]
+        // Group 1: The core field or expression
+        // Group 2: The raw alias string (if it exists)
+        $pattern = '/^(.+?)(?:\s+(?:as\s+)?(\w+))?$/i';
 
-        if ( str_contains( $column, ' ' ) ) {
-            [$value, $alias] = explode( ' ', $column, 2 );
+        if ( preg_match( $pattern, $column, $matches ) ) {
+            $value = trim( $matches[1] );
+            $alias = isset( $matches[2] ) ? trim( $matches[2] ) : null;
 
-            return [
-                'type' => 'column',
+            // Determine if the base value is a functional SQL expression
+            $is_expression = (bool) preg_match( '/\w+\s*\(.*\)/', $value );
+
+            $result = [
+                'type'  => $is_expression ? 'expression' : 'column',
                 'value' => $value,
-                'alias' => $alias
             ];
+
+            if ( null !== $alias ) {
+                $result['alias'] = $alias;
+            }
+
+            return $result;
         }
 
-        return ['type' => 'column', 'value' => $column];
-    } 
+        // Fallback safety net
+        return [
+            'type'  => 'column', 
+            'value' => $column
+        ];
+    }
 
     /**
      * Set the distinct flag
@@ -254,6 +278,68 @@ class SelectionIntent implements QueryItentInterface{
     public function offset( int $offset ) : static {
         $this->offset = $offset;
         return $this;
+    }
+
+    /**
+     * Set shared lock mode
+     */
+    public function shared_lock() : static {
+        return $this->set_lock_mode( LockMode::SHARED );
+    }
+
+    /**
+     * Set for update lock mode
+     */
+    public function lock_for_update() {
+        return $this->set_lock_mode( LockMode::EXCLUSIVE );
+    }
+
+    /**
+     * Set no-wait lock mode.
+     */
+    public function lock_no_wait() : static {
+        return $this->set_lock_mode( LockMode::NO_WAIT );
+    }
+
+    /**
+     * Set lock mode none
+     */
+    public function lock_none() : static {
+        return $this->set_lock_mode( LockMode::NONE );
+    }
+
+    /**
+     * Set skip lock mode
+     */
+    public function lock_mode_skip() : static {
+        return $this->set_lock_mode( LockMode::SKIP_LOCKED );
+    }
+
+    /**
+     * Set lock mode.
+     * 
+     * @param Lockmode $mode
+     */
+    public function set_lock_mode( LockMode $mode ) : static {
+        $this->lockMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of lock mode.
+     */
+    public function get_lock_mode() : LockMode {
+        return $this->lockMode;
+    }
+
+    /**
+     * Tells whether lock mode is set.
+     * 
+     * @return bool
+     */
+    public function has_lock_mode() : bool {
+        return LockMode::NONE !== $this->lockMode;
     }
 
     /**
