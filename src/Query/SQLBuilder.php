@@ -231,6 +231,24 @@ class SQLBuilder {
         return $this;
     }
 
+    /**
+     * Set the active intent property.
+     * 
+     * Used to elevate query to compound/composite intent.
+     * 
+     * @param object|null $intent
+     */
+    public function set_active_intent( ?object $intent ) : void {
+        $this->active_intent    = $intent;
+    }
+
+    /**
+     * Set the internal query type constant.
+     */
+    public function set_type( string $type ) : void {
+        $this->type = $type;
+    }
+
     /*
     |-------------------------------------------
     |RENDERING (Delegation to Engine Renderer)
@@ -264,6 +282,7 @@ class SQLBuilder {
             'ALTER TABLE'       => $renderer->render_alter_table( $this->active_intent ),
             'TRUNCATE TABLE'    => $renderer->render_truncate_table( $this->active_intent ),
             'DROP TABLE'        => $renderer->render_drop_table( $this->table, $this->intent ),
+            'COMPOUND SELECT'   => $renderer->render_compound_select( $this->active_intent ),
             default             => throw new \Exception( "Unknown query type: {$this->type}" )
         };
     

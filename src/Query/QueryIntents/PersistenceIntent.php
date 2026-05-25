@@ -21,7 +21,7 @@ use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
  * 
  * @since 0.2.0
  */
-class PersistenceIntent implements QueryItentInterface {
+class PersistenceIntent implements QueryIntentInterface {
     use QueryCriteriaTrait, SQLBuilderStrategyTrait;
     /**
      * @var string $table_name The target table name.

@@ -13,7 +13,7 @@ trait SQLBuilderStrategyTrait {
      * 
      * @var SQLBuilder $builder
      */
-    private SQLBuilder $builder;
+    protected SQLBuilder $builder;
     
     /**
      * Build query.

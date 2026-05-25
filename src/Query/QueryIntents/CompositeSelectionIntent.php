@@ -6,7 +6,7 @@
  * Follows the exact same patterns as SelectionIntent:
  * - Uses QueryCriteriaTrait for WHERE conditions
  * - Uses SQLBuilderStrategyTrait for builder reference
- * - Implements QueryItentInterface
+ * - Implements QueryIntentInterface
  * - Fluent API returning static
  *
  * @author Callistus Nwachukwu
@@ -32,7 +32,7 @@ use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
  *
  * @since 0.2.0
  */
-class CompositeSelectionIntent implements QueryItentInterface {
+class CompositeSelectionIntent implements QueryIntentInterface {
 	use SQLBuilderStrategyTrait;
 
 	/**

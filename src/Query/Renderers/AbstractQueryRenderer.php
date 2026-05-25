@@ -10,6 +10,7 @@
 namespace Callismart\DBPrism\Query\Renderers;
 
 use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\CompoundQueryIntent;
 use Callismart\DBPrism\Query\QueryIntents\CreateIndexIntent;
 use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
@@ -156,6 +157,29 @@ abstract class AbstractQueryRenderer {
         $sql .= $this->render_lock_mode( $intent->get_lock_mode() );
 
         return $sql . ";";
+    }
+
+/**
+     * Render a stacked composite set statement.
+     * Safe across MySQL, PostgreSQL, SQLite, and future relational engines.
+     * * @param CompoundQueryIntent $compound
+     * @return string
+     */
+    public function render_compound_select( CompoundQueryIntent $compound ) : string {
+        $sql_parts = [];
+
+        $sql_parts[] = rtrim( $this->render_select( $compound->get_primary() ), ';' );
+
+        foreach ( $compound->get_unions() as $union ) {
+            $compiled = rtrim( $this->render_select( $union->intent ), ';' );
+            $sql_parts[] = "{$union->operator} {$compiled}";
+        }
+
+        $compound_sql = implode( "\n", $sql_parts );
+
+        $wrapper_alias = $this->quote_identifier( 'compound_dataset' );
+
+        return "SELECT * FROM (\n{$compound_sql}\n) AS {$wrapper_alias};";
     }
 
     /**

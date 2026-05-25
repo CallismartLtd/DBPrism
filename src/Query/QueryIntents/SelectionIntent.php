@@ -22,8 +22,8 @@ use Callismart\DBPrism\Utils\LockMode;
  * 
  * @since 0.2.0
  */
-class SelectionIntent implements QueryItentInterface{
-    use QueryCriteriaTrait, SQLBuilderStrategyTrait;
+class SelectionIntent implements QueryIntentInterface{
+    use QueryCriteriaTrait, SQLBuilderStrategyTrait, SupportsUnionsTrait;
 
     /**
      * @var array $columns Columns to be selected.

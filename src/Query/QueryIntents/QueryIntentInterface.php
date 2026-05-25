@@ -8,7 +8,7 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Query\QueryIntents;
 
-interface QueryItentInterface {
+interface QueryIntentInterface {
     /**
      * Reconstruct a new self using existing factory methods
      */
@@ -27,4 +27,12 @@ interface QueryItentInterface {
      * @return string
      */
     public function build_raw(): string;
+
+    /**
+     * Get the parameter bindings.
+     */
+    public function get_bindings() : array;
+
+    public function union( QueryIntentInterface $intent ) : CompoundQueryIntent;
+    public function union_all( QueryIntentInterface $intent ) : CompoundQueryIntent;
 }
