@@ -15,6 +15,7 @@ use Callismart\DBPrism\Query\QueryIntents\CreateIndexIntent;
 use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
 use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
+use Callismart\DBPrism\Query\QueryIntents\QueryIntentInterface;
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
@@ -159,7 +160,13 @@ abstract class AbstractQueryRenderer {
         return $sql . ";";
     }
 
-/**
+    /*
+    |--------------------------------------------------------------------------
+    | Advanced Composite Selection (CTEs)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
      * Render a stacked composite set statement.
      * Safe across MySQL, PostgreSQL, SQLite, and future relational engines.
      * * @param CompoundQueryIntent $compound
@@ -180,6 +187,55 @@ abstract class AbstractQueryRenderer {
         $wrapper_alias = $this->quote_identifier( 'compound_dataset' );
 
         return "SELECT * FROM (\n{$compound_sql}\n) AS {$wrapper_alias};";
+    }
+
+    /**
+     * Render a Selection Query using a standard Common Table Expression (CTE).
+     * * Supported out-of-the-box in MySQL 8.0+, PostgreSQL, and SQLite 3.8.3+.
+     *
+     * @param string                $cte_name     The temporary reference name for the expression dataset.
+     * @param QueryIntentInterface  $cte_intent    The subquery dataset intent (SelectionIntent or CompoundQueryIntent).
+     * @param SelectionIntent       $main_intent  The primary selection execution view reading from the CTE.
+     * @return string The fully compiled CTE query string.
+     */
+    public function render_cte_select( string $cte_name, QueryIntentInterface $cte_intent, SelectionIntent $main_intent ) : string {
+        $cte_name_quoted = $this->quote_identifier( $cte_name );
+        
+        // Strip trailing statement markers from both the sub-intent and master intent blocks
+        $compiled_cte  = rtrim( $cte_intent->build(), ';' );
+        $compiled_main = $this->render_select( $main_intent );
+        
+        return "WITH {$cte_name_quoted} AS (\n{$compiled_cte}\n)\n{$compiled_main}";
+    }
+
+    /**
+     * Render a self-referential recursive hierarchy traversal statement.
+     * * Ideal for infinite graph data trees like nested comments, menus, or directories.
+     *
+     * @param string          $cte_name          The temporary reference name for the looping dataset table.
+     * @param SelectionIntent $anchor_intent     The initial anchor query mapping the tree roots.
+     * @param SelectionIntent $recursive_intent  The self-referential subquery looping back against the active CTE.
+     * @param SelectionIntent $final_intent      The final statement drawing out the accumulated tree properties.
+     * @return string The fully compiled recursive statement.
+     */
+    public function render_recursive_cte( 
+        string $cte_name, 
+        SelectionIntent $anchor_intent, 
+        SelectionIntent $recursive_intent, 
+        SelectionIntent $final_intent 
+    ) : string {
+        $name_quoted = $this->quote_identifier( $cte_name );
+        
+        $anchor_sql    = rtrim( $this->render_select( $anchor_intent ), ';' );
+        $recursive_sql = rtrim( $this->render_select( $recursive_intent ), ';' );
+        $final_sql     = $this->render_select( $final_intent );
+        
+        // Default ANSI SQL layout containing the standard "RECURSIVE" modifier
+        return "WITH RECURSIVE {$name_quoted} AS (\n" .
+               "    {$anchor_sql}\n" .
+               "    UNION ALL\n" .
+               "    {$recursive_sql}\n" .
+               ")\n{$final_sql}";
     }
 
     /**
