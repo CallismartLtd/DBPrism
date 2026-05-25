@@ -22,7 +22,7 @@ use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
  * @since 0.2.0
  */
 class PersistenceIntent implements QueryIntentInterface {
-    use QueryCriteriaTrait, SQLBuilderStrategyTrait;
+    use QueryCriteriaTrait, SQLBuilderStrategyTrait, SupportsUnionsTrait;
     /**
      * @var string $table_name The target table name.
      */
