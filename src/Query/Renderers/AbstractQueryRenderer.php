@@ -175,18 +175,32 @@ abstract class AbstractQueryRenderer {
     public function render_compound_select( CompoundQueryIntent $compound ) : string {
         $sql_parts = [];
 
+        // Compile the primary master dataset block segment
         $sql_parts[] = rtrim( $this->render_select( $compound->get_primary() ), ';' );
 
+        // Stack trailing elements horizontally using a single inline space separation scheme
         foreach ( $compound->get_unions() as $union ) {
             $compiled = rtrim( $this->render_select( $union->intent ), ';' );
             $sql_parts[] = "{$union->operator} {$compiled}";
         }
 
-        $compound_sql = implode( "\n", $sql_parts );
-
+        // Standardize joining blocks with an active spacing separator
+        $compound_sql = implode( ' ', $sql_parts );
         $wrapper_alias = $this->quote_identifier( 'compound_dataset' );
 
-        return "SELECT * FROM (\n{$compound_sql}\n) AS {$wrapper_alias};";
+        $sql = "SELECT * FROM (\n{$compound_sql}\n) AS {$wrapper_alias}";
+
+        // 1. Compile and append global sorting requirements onto the trailing edge
+        if ( ! empty( $compound->get_orders() ) ) {
+            $sql .= $this->render_ordering( $compound->get_orders() );
+        }
+
+        // 2. Compile and append global pagination window boundaries onto the trailing edge
+        if ( $compound->get_limit() !== null ) {
+            $sql .= $this->render_limit_offset( $compound->get_limit(), $compound->get_offset() );
+        }
+
+        return $sql . ";";
     }
 
     /**
