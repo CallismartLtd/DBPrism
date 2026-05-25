@@ -4,16 +4,13 @@
  * 
  * @author Callistus Nwachukwu
  * @package Callismart\DBPrism\Query\Traits
- * @since 0.2.0
  */
 declare( strict_types=1 );
 
-namespace Callismart\DBPrism\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\Traits;
 
 /**
  * Provides fluent methods for building query conditions and managing bindings.
- * 
- * @since 0.2.0
  */
 trait QueryCriteriaTrait {
     /**

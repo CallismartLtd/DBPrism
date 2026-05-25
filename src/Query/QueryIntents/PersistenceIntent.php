@@ -11,8 +11,10 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
 use InvalidArgumentException;
-use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 
 /**
  * Represents an intent to persist or modify data (INSERT/UPDATE).

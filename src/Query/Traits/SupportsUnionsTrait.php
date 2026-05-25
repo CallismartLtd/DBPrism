@@ -1,6 +1,6 @@
 <?php
 
-namespace Callismart\DBPrism\Query\QueryIntents;
+namespace Callismart\DBPrism\Query\Traits;
 
 use Callismart\DBPrism\Query\QueryIntents\CompoundQueryIntent;
 use Callismart\DBPrism\Query\QueryIntents\QueryIntentInterface;

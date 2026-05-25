@@ -11,7 +11,8 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
-use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
+use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 
 /**
  * Represents an intent to delete data from the database.

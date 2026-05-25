@@ -496,14 +496,17 @@ abstract class AbstractQueryRenderer {
      */
     public function quote_identifier( string $identifier ) : string {
         if ( $identifier === '*' ) return '*';
+
         if ( str_contains( $identifier, ' ' ) ) {
             $parts = explode( ' ', $identifier );
             return $this->quote_identifier( $parts[0] ) . ' ' . $this->quote_identifier( $parts[1] );
         }
+
         if ( str_contains( $identifier, '.' ) ) {
             $parts = array_map( [ $this, 'quote_single_identifier' ], explode( '.', $identifier ) );
             return implode( '.', $parts );
         }
+
         return $this->quote_single_identifier( $identifier );
     }
 

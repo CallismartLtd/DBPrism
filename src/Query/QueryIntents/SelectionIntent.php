@@ -10,8 +10,13 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Query\QueryIntents;
 
+use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
+use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Query\SQLBuilder;
-use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
+use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
+use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
 use Callismart\DBPrism\Utils\LockMode;
 
 /**
@@ -23,7 +28,8 @@ use Callismart\DBPrism\Utils\LockMode;
  * @since 0.2.0
  */
 class SelectionIntent implements QueryIntentInterface{
-    use QueryCriteriaTrait, SQLBuilderStrategyTrait, SupportsUnionsTrait;
+    use QueryCriteriaTrait, SQLBuilderStrategyTrait,
+    SupportsUnionsTrait, SupportsGroupingTrait, SupportsOrderingTrait, SupportsSlicingTrait;
 
     /**
      * @var array $columns Columns to be selected.
@@ -39,16 +45,6 @@ class SelectionIntent implements QueryIntentInterface{
      * @var array $joins Structured join definitions.
      */
     protected array $joins = [];
-
-    /**
-     * @var array $groups Grouping columns for the GROUP BY clause.
-     */
-    protected array $groups = [];
-
-    /**
-     * @var array $orders Ordering definitions (column and direction).
-     */
-    protected array $orders = [];
 
     /**
      * @var int|null $limit Maximum number of rows to return.
@@ -100,8 +96,7 @@ class SelectionIntent implements QueryIntentInterface{
 
     /**
      * Normalize columns and expressions, extracting aliases when present.
-     * 
-     * @param string $column
+     * * @param string $column
      * @return array
      */
     protected function normalize_column( string $column ) : array {
@@ -123,8 +118,15 @@ class SelectionIntent implements QueryIntentInterface{
             $value = trim( $matches[1] );
             $alias = isset( $matches[2] ) ? trim( $matches[2] ) : null;
 
+            // Check if the value is wrapped in single or double quotes (a string literal)
+            $is_string_literal = ( str_starts_with( $value, "'" ) && str_ends_with( $value, "'" ) )
+                              || ( str_starts_with( $value, '"' ) && str_ends_with( $value, '"' ) );
+
             // Determine if the base value is a functional SQL expression
-            $is_expression = (bool) preg_match( '/\w+\s*\(.*\)/', $value );
+            $is_functional = (bool) preg_match( '/\w+\s*\(.*\)/', $value );
+
+            // Mark as expression if it is a function call OR a raw string literal
+            $is_expression = $is_string_literal || $is_functional;
 
             $result = [
                 'type'  => $is_expression ? 'expression' : 'column',
@@ -144,7 +146,6 @@ class SelectionIntent implements QueryIntentInterface{
             'value' => $column
         ];
     }
-
     /**
      * Set the distinct flag
      * 
@@ -229,54 +230,6 @@ class SelectionIntent implements QueryIntentInterface{
      */
     protected function add_join_entry( string $table, string $first, string $operator, string $second, string $type ) : static {
         $this->joins[] = compact( 'table', 'first', 'operator', 'second', 'type' );
-        return $this;
-    }
-
-    /**
-     * Add columns to the GROUP BY clause.
-     * 
-     * @param string ...$columns Variadic list of columns.
-     * @return $this
-     */
-    public function group_by( string ...$columns ) : static {
-        $this->groups = array_merge( $this->groups, $columns );
-        return $this;
-    }
-
-    /**
-     * Add a column to the ORDER BY clause.
-     * 
-     * @param string $column
-     * @param string $direction Sort direction (ASC or DESC).
-     * @return $this
-     */
-    public function order_by( string $column, string $direction = 'ASC' ) : static {
-        $this->orders[] = [
-            'column'    => $column,
-            'direction' => strtoupper( trim( $direction ) )
-        ];
-        return $this;
-    }
-
-    /**
-     * Set the LIMIT clause.
-     * 
-     * @param int $limit
-     * @return $this
-     */
-    public function limit( int $limit ) : static {
-        $this->limit = $limit;
-        return $this;
-    }
-
-    /**
-     * Set the OFFSET clause.
-     * 
-     * @param int $offset
-     * @return $this
-     */
-    public function offset( int $offset ) : static {
-        $this->offset = $offset;
         return $this;
     }
 
@@ -385,42 +338,6 @@ class SelectionIntent implements QueryIntentInterface{
      */
     public function get_joins() : array {
         return $this->joins;
-    }
-
-    /**
-     * Get grouping columns.
-     * 
-     * @return array
-     */
-    public function get_groups() : array {
-        return $this->groups;
-    }
-
-    /**
-     * Get ordering definitions.
-     * 
-     * @return array
-     */
-    public function get_orders() : array {
-        return $this->orders;
-    }
-
-    /**
-     * Get the row limit.
-     * 
-     * @return int|null
-     */
-    public function get_limit() : ?int {
-        return $this->limit;
-    }
-
-    /**
-     * Get the row offset.
-     * 
-     * @return int|null
-     */
-    public function get_offset() : ?int {
-        return $this->offset;
     }
 
     /**

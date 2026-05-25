@@ -11,7 +11,7 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
-use Callismart\DBPrism\Query\SQLBuilderStrategyTrait;
+use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Utils\Column;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\Table;

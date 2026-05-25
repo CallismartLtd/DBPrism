@@ -5,7 +5,9 @@
  * @author Callistus Nwachukwu
  */
 
-namespace Callismart\DBPrism\Query;
+namespace Callismart\DBPrism\Query\Traits;
+
+use Callismart\DBPrism\Query\SQLBuilder;
 
 trait SQLBuilderStrategyTrait {
     /**
