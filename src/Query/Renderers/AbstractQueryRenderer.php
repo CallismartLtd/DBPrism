@@ -161,46 +161,79 @@ abstract class AbstractQueryRenderer {
     }
 
     /*
-    |--------------------------------------------------------------------------
+    |-----------------------------------------
     | Advanced Composite Selection (CTEs)
-    |--------------------------------------------------------------------------
+    |-----------------------------------------
     */
 
     /**
      * Render a stacked composite set statement.
      * Safe across MySQL, PostgreSQL, SQLite, and future relational engines.
-     * * @param CompoundQueryIntent $compound
+     * 
+     * @param CompoundQueryIntent $compound
      * @return string
      */
     public function render_compound_select( CompoundQueryIntent $compound ) : string {
         $sql_parts = [];
 
-        // Compile the primary master dataset block segment
+        // Compile the primary master dataset block segment.
         $sql_parts[] = rtrim( $this->render_select( $compound->get_primary() ), ';' );
 
-        // Stack trailing elements horizontally using a single inline space separation scheme
+        // Stack trailing elements horizontally using a 
+        // single inline space separation scheme.
         foreach ( $compound->get_unions() as $union ) {
             $compiled = rtrim( $this->render_select( $union->intent ), ';' );
             $sql_parts[] = "{$union->operator} {$compiled}";
         }
 
-        // Standardize joining blocks with an active spacing separator
+        // Standardize joining blocks with an active spacing separator.
         $compound_sql = implode( ' ', $sql_parts );
-        $wrapper_alias = $this->quote_identifier( 'compound_dataset' );
+        
+        // Resolve the dynamic subquery wrapper identifier name.
+        $alias_name    = $compound->get_wrapper_alias() ?: 'compound_dataset';
+        $wrapper_alias = $this->quote_identifier( $alias_name );
 
-        $sql = "SELECT * FROM (\n{$compound_sql}\n) AS {$wrapper_alias}";
+        // Process the pre-normalized outer column projection list.
+        $outer_select_fields = [];
+        $selections          = $compound->get_outer_selections();
 
-        // 1. Compile and append global sorting requirements onto the trailing edge
+        if ( empty( $selections ) ) {
+            $outer_select_fields[] = '*';
+        } else {
+            foreach ( $selections as $normalized ) {
+                // Formulate identifiers versus functional
+                // string expressions cleanly.
+                if ( 'expression' === $normalized['type'] ) {
+                    $field_sql = $normalized['value'];
+                } else {
+                    $field_sql = $this->quote_identifier( $normalized['value'] );
+                }
+
+                // Append custom column projection naming markers if tracked
+                if ( isset( $normalized['alias'] ) ) {
+                    $field_sql .= ' AS ' . $this->quote_identifier( $normalized['alias'] );
+                }
+
+                $outer_select_fields[] = $field_sql;
+            }
+        }
+
+        $outer_select_clause = implode( ', ', $outer_select_fields );
+
+        // Assemble the dynamic outer wrapping structural layout.
+        $sql = "SELECT {$outer_select_clause} FROM (\n{$compound_sql}\n) AS {$wrapper_alias}";
+
+        // Compile and append global sorting requirements onto the trailing edge.
         if ( ! empty( $compound->get_orders() ) ) {
             $sql .= $this->render_ordering( $compound->get_orders() );
         }
 
-        // 2. Compile and append global pagination window boundaries onto the trailing edge
+        // Compile and append global pagination window boundaries onto the trailing edge.
         if ( $compound->get_limit() !== null ) {
             $sql .= $this->render_limit_offset( $compound->get_limit(), $compound->get_offset() );
         }
 
-        return $sql . ";";
+        return $sql . ';';
     }
 
     /**

@@ -1,7 +1,8 @@
 <?php
 /**
  * Supports Slicing Trait file.
- * * @author Callistus Nwachukwu
+ * 
+ * @author Callistus Nwachukwu
  * @package Callismart\DBPrism\Query\Traits
  * @since 0.2.0
  */
@@ -11,9 +12,11 @@ namespace Callismart\DBPrism\Query\Traits;
 
 /**
  * Provides fluent methods for managing SQL LIMIT and OFFSET boundaries.
- * * This trait encapsulates pagination constraints, allowing execution sets
+ * 
+ * This trait encapsulates pagination constraints, allowing execution sets
  * like SelectionIntent and CompoundQueryIntent to control row counts.
- * * @since 0.2.0
+ * 
+ * @since 0.2.0
  */
 trait SupportsSlicingTrait {
     /**
@@ -28,7 +31,8 @@ trait SupportsSlicingTrait {
 
     /**
      * Set the maximum row window constraint (LIMIT clause).
-     * * @param int $limit The maximum number of records to pull.
+     * 
+     * @param int $limit The maximum number of records to pull.
      * @return static Fluent builder instance.
      */
     public function limit( int $limit ) : static {
@@ -38,7 +42,8 @@ trait SupportsSlicingTrait {
 
     /**
      * Set the structural starting boundary offset (OFFSET clause).
-     * * @param int $offset The number of preceding records to skip.
+     * 
+     * @param int $offset The number of preceding records to skip.
      * @return static Fluent builder instance.
      */
     public function offset( int $offset ) : static {
@@ -48,7 +53,8 @@ trait SupportsSlicingTrait {
 
     /**
      * Retrieve the defined row limit constraint.
-     * * @return int|null The row threshold count or null if unbound.
+     * 
+     * @return int|null The row threshold count or null if unbound.
      */
     public function get_limit() : ?int {
         return $this->limit;
@@ -56,7 +62,8 @@ trait SupportsSlicingTrait {
 
     /**
      * Retrieve the active pagination starting offset constraint.
-     * * @return int|null The row skipped counter or null if unbound.
+     * 
+     * @return int|null The row skipped counter or null if unbound.
      */
     public function get_offset() : ?int {
         return $this->offset;

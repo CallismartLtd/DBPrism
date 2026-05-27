@@ -90,7 +90,8 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an OR WHERE IS NULL clause.
-     * * @param string $column The target column.
+     * 
+     * @param string $column The target column.
      * @return static Fluent builder instance.
      */
     public function or_where_null( string $column ) : static {
@@ -99,7 +100,8 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an OR WHERE IS NOT NULL clause.
-     * * @param string $column The target column.
+     * 
+     * @param string $column The target column.
      * @return static Fluent builder instance.
      */
     public function or_where_not_null( string $column ) : static {

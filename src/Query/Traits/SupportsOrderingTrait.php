@@ -1,7 +1,8 @@
 <?php
 /**
  * Supports Ordering Trait file.
- * * @author Callistus Nwachukwu
+ * 
+ * @author Callistus Nwachukwu
  * @package Callismart\DBPrism
  */
 declare( strict_types=1 );
@@ -23,7 +24,8 @@ trait SupportsOrderingTrait {
 
     /**
      * Add a column sorting rule to the ORDER BY clause.
-     * * @param string $column    The database column name or dot-notation identifier.
+     * 
+     * @param string $column    The database column name or dot-notation identifier.
      * @param string $direction Sort direction. Must be either 'ASC' or 'DESC'. Default 'ASC'.
      * @return static Fluent builder instance.
      */
@@ -37,7 +39,8 @@ trait SupportsOrderingTrait {
 
     /**
      * Retrieve all defined ordering definitions for rendering.
-     * * @return array Array of arrays containing 'column' and 'direction' keys.
+     * 
+     * @return array Array of arrays containing 'column' and 'direction' keys.
      */
     public function get_orders() : array {
         return $this->orders;

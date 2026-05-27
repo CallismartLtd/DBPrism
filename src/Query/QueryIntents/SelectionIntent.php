@@ -18,6 +18,7 @@ use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
 use Callismart\DBPrism\Utils\LockMode;
+use Smliser\Query\Traits\ColumnNormalizerTrait;
 
 /**
  * Represents an intent to select data from the database.
@@ -29,7 +30,8 @@ use Callismart\DBPrism\Utils\LockMode;
  */
 class SelectionIntent implements QueryIntentInterface{
     use QueryCriteriaTrait, SQLBuilderStrategyTrait,
-    SupportsUnionsTrait, SupportsGroupingTrait, SupportsOrderingTrait, SupportsSlicingTrait;
+    SupportsUnionsTrait, SupportsGroupingTrait, SupportsOrderingTrait,
+    SupportsSlicingTrait, ColumnNormalizerTrait;
 
     /**
      * @var array $columns Columns to be selected.
@@ -94,58 +96,6 @@ class SelectionIntent implements QueryIntentInterface{
         return $this;
     }
 
-    /**
-     * Normalize columns and expressions, extracting aliases when present.
-     * * @param string $column
-     * @return array
-     */
-    protected function normalize_column( string $column ) : array {
-        $column = trim( $column );
-
-        if ( '*' === $column || '' === $column ) {
-            return [
-                'type'  => 'column',
-                'value' => '*'
-            ];
-        }
-
-        // Match: [Anything] followed optionally by (whitespace + optional 'AS' + whitespace) and an [Alias]
-        // Group 1: The core field or expression
-        // Group 2: The raw alias string (if it exists)
-        $pattern = '/^(.+?)(?:\s+(?:as\s+)?(\w+))?$/i';
-
-        if ( preg_match( $pattern, $column, $matches ) ) {
-            $value = trim( $matches[1] );
-            $alias = isset( $matches[2] ) ? trim( $matches[2] ) : null;
-
-            // Check if the value is wrapped in single or double quotes (a string literal)
-            $is_string_literal = ( str_starts_with( $value, "'" ) && str_ends_with( $value, "'" ) )
-                              || ( str_starts_with( $value, '"' ) && str_ends_with( $value, '"' ) );
-
-            // Determine if the base value is a functional SQL expression
-            $is_functional = (bool) preg_match( '/\w+\s*\(.*\)/', $value );
-
-            // Mark as expression if it is a function call OR a raw string literal
-            $is_expression = $is_string_literal || $is_functional;
-
-            $result = [
-                'type'  => $is_expression ? 'expression' : 'column',
-                'value' => $value,
-            ];
-
-            if ( null !== $alias ) {
-                $result['alias'] = $alias;
-            }
-
-            return $result;
-        }
-
-        // Fallback safety net
-        return [
-            'type'  => 'column', 
-            'value' => $column
-        ];
-    }
     /**
      * Set the distinct flag
      * 

@@ -1,7 +1,8 @@
 <?php
 /**
  * TruncateTable Query Intent class file.
- * * @author Callistus Nwachukwu
+ * 
+ * @author Callistus Nwachukwu
  * @package Callismart\DBPrism\Query\QueryIntents
  * @since 0.2.0
  * */
@@ -15,8 +16,9 @@ use Exception;
 
 /**
  * Represents an intent to wipe all data from one or more database tables.
- * * Collects behaviors regarding identity sequences and relational cascades.
- * * @since 0.2.0
+ * Collects behaviors regarding identity sequences and relational cascades.
+ * 
+ * @since 0.2.0
  */
 class TruncateTableIntent {
     use SQLBuilderStrategyTrait;
@@ -69,7 +71,8 @@ class TruncateTableIntent {
 
     /**
      * Retrieve the list of tables targetted by this intent.
-     * * @return array<string>
+     * 
+     * @return array<string>
      */
     public function get_tables() : array {
         return $this->tables;
@@ -77,7 +80,8 @@ class TruncateTableIntent {
 
     /**
      * Determine if identity/auto-increment sequences should be reset.
-     * * @return bool
+     * 
+     * @return bool
      */
     public function should_restart_identity() : bool {
         return $this->restart_identity;
@@ -85,7 +89,8 @@ class TruncateTableIntent {
 
     /**
      * Determine if dependent tables should be truncated recursively.
-     * * @return bool
+     * 
+     * @return bool
      */
     public function should_cascade() : bool {
         return $this->cascade;
@@ -93,7 +98,8 @@ class TruncateTableIntent {
 
     /**
      * Static factory.
-     * * @param array      $tables   Array of table names.
+     * 
+     * @param array      $tables   Array of table names.
      * @param SQLBuilder $builder  The active SQL builder.
      * @return static Fluent
      */

@@ -28,7 +28,8 @@ trait SQLBuilderStrategyTrait {
 
     /**
      * Build the raw sql with the parameters.
-     * * @return string
+     * 
+     * @return string
      */
     public function build_raw(): string {
         $sql      = $this->build();

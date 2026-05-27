@@ -15,6 +15,7 @@ use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
+use Smliser\Query\Traits\ColumnNormalizerTrait;
 
 /**
  * Represents an intent to execute combined structural relational set operations.
@@ -25,7 +26,7 @@ use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
  */
 class CompoundQueryIntent implements QueryIntentInterface {
     use SupportsUnionsTrait, SQLBuilderStrategyTrait,
-        SupportsSlicingTrait, SupportsOrderingTrait;
+        SupportsSlicingTrait, SupportsOrderingTrait, ColumnNormalizerTrait;
 
     /**
      * Collection of subsequent stacked compound dataset components.
@@ -49,6 +50,20 @@ class CompoundQueryIntent implements QueryIntentInterface {
     protected SQLBuilder $builder;
 
     /**
+     * Pre-normalized outer selection contexts for wrapping the compound query.
+     * 
+     * @var array<int, array{type: string, value: string, alias?: string}>
+     */
+    protected array $outer_selections = [];
+
+    /**
+     * Optional alias for the compound query when used as a subquery in FROM clauses.
+     * 
+     * @var string|null
+     */
+    protected ?string $wrapper_alias = null;
+
+    /**
      * Construct a compound context wrapping two starting operations.
      * 
      * @param QueryIntentInterface $primary  The initial root dataset expression.
@@ -69,6 +84,35 @@ class CompoundQueryIntent implements QueryIntentInterface {
         // Update the orchestrator's state target tracking pointer.
         $this->builder->set_active_intent( $this );
         $this->builder->set_type( 'COMPOUND SELECT' );
+    }
+
+    /**
+     * Select a column or expression, normalizing it into a structured descriptor mapping.
+     * 
+     * @var string[] ...$columns Variadic list of raw column strings or expressions.
+     * @return static Fluent.
+     */
+    public function select( string ...$columns ) : static {
+
+        if ( empty( $columns ) ) {
+            $columns = ['*'];
+        }
+
+        foreach ( $columns as $column ) {
+            $this->outer_selections[] = $this->normalize_column( $column );
+        }
+        return $this;
+    }
+
+    /**
+     * Define a custom subquery alias name instead of the framework default.
+     *
+     * @param string $alias The identifier alias name.
+     * @return static Fluent.
+     */
+    public function as( string $alias ) : static {
+        $this->wrapper_alias = trim( $alias );
+        return $this;
     }
 
     /**
@@ -109,6 +153,24 @@ class CompoundQueryIntent implements QueryIntentInterface {
      */
     public function get_unions() : array {
         return $this->unions;
+    }
+
+    /**
+     * Retrieve the array of pre-normalized outer column selection maps.
+     * 
+     * @return array<int, array{type: string, value: string, alias?: string}>
+     */
+    public function get_outer_selections() : array {
+        return $this->outer_selections;
+    }
+
+    /**
+     * Retrieve the custom assigned wrapper alias name.
+     * 
+     * @return string|null
+     */
+    public function get_wrapper_alias() : ?string {
+        return $this->wrapper_alias;
     }
 
     /**

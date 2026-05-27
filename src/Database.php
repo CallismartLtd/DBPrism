@@ -150,7 +150,8 @@ class Database {
 
     /**
      * Calculate query offset from page and limit.
-     * * @param int $page The current pagination number.
+     * 
+     * @param int $page The current pagination number.
      * @param int $limit The result limit for the current request.
      * @return int Calculated offset.
      */
