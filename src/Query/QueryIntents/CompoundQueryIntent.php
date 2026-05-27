@@ -11,11 +11,11 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
-use Smliser\Query\Traits\ColumnNormalizerTrait;
 
 /**
  * Represents an intent to execute combined structural relational set operations.

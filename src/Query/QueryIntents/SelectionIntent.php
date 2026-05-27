@@ -13,12 +13,12 @@ namespace Callismart\DBPrism\Query\QueryIntents;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
 use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
 use Callismart\DBPrism\Utils\LockMode;
-use Smliser\Query\Traits\ColumnNormalizerTrait;
 
 /**
  * Represents an intent to select data from the database.

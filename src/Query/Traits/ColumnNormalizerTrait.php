@@ -7,7 +7,7 @@
  */
 declare( strict_types=1 );
 
-namespace Smliser\Query\Traits;
+namespace Callismart\DBPrism\Query\Traits;
 
 /**
  * Trait ColumnNormalizerTrait
