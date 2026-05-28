@@ -196,6 +196,30 @@ class CompoundQueryIntent implements QueryIntentInterface {
     }
 
     /**
+     * Deep clone nested compound query graph components.
+     *
+     * @return void
+     */
+    public function __clone() : void {
+
+        $this->primary_intent   = clone $this->primary_intent;
+        $this->builder          = clone $this->builder;
+
+        // Update the orchestrator's state target tracking pointer.
+        $this->builder->set_active_intent( $this );
+        $this->builder->set_type( 'COMPOUND SELECT' );
+
+        foreach ( $this->unions as $index => $union ) {
+            $this->unions[ $index ] = clone $union;
+        }
+
+        // Reset outer selections and wrapper alias
+        // as they are context-specific and should not be shared across clones.
+        $this->outer_selections = [];
+        $this->wrapper_alias    = null;
+    }
+
+    /**
      * {@inheritdoc}
      *
      * @throws \BadMethodCallException Compound query environments cannot be dynamically cloned without explicit boundaries.

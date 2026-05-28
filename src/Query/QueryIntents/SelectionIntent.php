@@ -303,4 +303,9 @@ class SelectionIntent implements QueryIntentInterface{
     public function new_instance() : static {
         return new static( $this->builder );
     }
+
+    public function __clone() : void {
+        $this->builder = clone $this->builder;
+        
+    }
 }

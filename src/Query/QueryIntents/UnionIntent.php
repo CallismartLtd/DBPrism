@@ -80,4 +80,8 @@ class UnionIntent {
 		return 'UNION ALL' === $this->type;
 	}
 
+	public function __clone() : void {
+		$this->selection = clone $this->selection;
+	}
+
 }

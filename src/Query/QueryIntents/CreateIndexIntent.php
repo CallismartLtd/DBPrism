@@ -71,4 +71,8 @@ class CreateIndexIntent {
     public function get_index() : Constraint {
         return $this->index;
     }
+
+    public function __clone() : void {
+        $this->index = clone $this->index;
+    }
 }

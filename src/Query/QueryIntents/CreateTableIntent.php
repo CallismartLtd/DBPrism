@@ -141,4 +141,8 @@ class CreateTableIntent {
     public function get_bindings() : array {
         throw new Exception( 'Query parameter binding not supported for admin intents' );
     }
+
+    public function __clone() : void {
+        $this->table = clone $this->table;
+    }
 }

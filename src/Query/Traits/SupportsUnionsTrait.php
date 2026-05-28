@@ -7,7 +7,13 @@ use Callismart\DBPrism\Query\QueryIntents\QueryIntentInterface;
 use Callismart\DBPrism\Query\SQLBuilder;
 
 trait SupportsUnionsTrait {
+    /**
+     * The orchestrating builder factory instance.
+     *
+     * @var SQLBuilder
+     */
     protected SQLBuilder $builder;
+    
     public function union( QueryIntentInterface $intent ) : CompoundQueryIntent {
         return new CompoundQueryIntent( $this, $intent, 'UNION', $this->builder );
     }
