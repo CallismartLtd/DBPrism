@@ -246,14 +246,14 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a basic WHERE LIKE clause with automatic value escaping.
-     * 
-     * @param string $column   The target column.
+     * * @param string $column   The target column.
      * @param string $value    The search pattern (e.g., '%term%').
      * @param string $boolean  Logical connector (AND / OR).
      * @param bool   $not      Whether to negate (NOT LIKE).
+     * @param bool   $is_pre_escaped Internal flag to skip double-escaping from helpers.
      * @return static
      */
-    public function where_like( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
+    public function where_like( string $column, string $value, string $boolean = 'AND', bool $not = false, bool $is_pre_escaped = false ) : static {
         $this->conditions[] = [
             'type'    => 'Like',
             'column'  => $column,
@@ -261,10 +261,17 @@ trait QueryCriteriaTrait {
             'not'     => $not
         ];
 
-        // Ensure literal % and _ in user input are escaped using '='
-        $this->bindings[] = $this->escape_like_value( $value );
+        // If it's from where_contains/starts/ends, skip parsing to avoid double-escaping
+        $this->bindings[] = $is_pre_escaped ? $value : $this->escape_like_value( $value );
 
         return $this;
+    }
+
+    /**
+     * Add an OR WHERE LIKE clause.
+     */
+    public function or_where_like( string $column, string $value ) : static {
+        return $this->where_like( $column, $value, 'OR' );
     }
 
     /**
@@ -275,34 +282,106 @@ trait QueryCriteriaTrait {
     }
 
     /**
+     * Add an OR WHERE NOT LIKE clause.
+     */
+    public function or_where_not_like( string $column, string $value ) : static {
+        return $this->where_like( $column, $value, 'OR', true );
+    }
+
+    /**
      * Add a "contains" search (wraps term in % %).
      */
-    public function where_contains( string $column, string $value, string $boolean = 'AND' ) : static {
-        return $this->where_like( $column, '%' . $this->escape_like_term( $value ) . '%', $boolean );
+    public function where_contains( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
+        $pattern = '%' . $this->escape_like_term( $value ) . '%';
+        return $this->where_like( $column, $pattern, $boolean, $not, true );
+    }
+
+    /**
+     * Add a "NOT contains" search.
+     */
+    public function where_not_contains( string $column, string $value ) : static {
+        return $this->where_contains( $column, $value, 'AND', true );
+    }
+
+    /**
+     * Add an "OR contains" search.
+     */
+    public function or_where_contains( string $column, string $value ) : static {
+        return $this->where_contains( $column, $value, 'OR' );
+    }
+
+    /**
+     * Add an "OR NOT contains" search.
+     */
+    public function or_where_not_contains( string $column, string $value ) : static {
+        return $this->where_contains( $column, $value, 'OR', true );
     }
 
     /**
      * Add a "starts with" search (appends % to term).
      */
-    public function where_starts_with( string $column, string $value, string $boolean = 'AND' ) : static {
-        return $this->where_like( $column, $this->escape_like_term( $value ) . '%', $boolean );
+    public function where_starts_with( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
+        $pattern = $this->escape_like_term( $value ) . '%';
+        return $this->where_like( $column, $pattern, $boolean, $not, true );
+    }
+
+    /**
+     * Add a "NOT starts with" search.
+     */
+    public function where_not_starts_with( string $column, string $value ) : static {
+        return $this->where_starts_with( $column, $value, 'AND', true );
+    }
+
+    /**
+     * Add an "OR starts with" search.
+     */
+    public function or_where_starts_with( string $column, string $value ) : static {
+        return $this->where_starts_with( $column, $value, 'OR' );
+    }
+
+    /**
+     * Add an "OR NOT starts with" search.
+     */
+    public function or_where_not_starts_with( string $column, string $value ) : static {
+        return $this->where_starts_with( $column, $value, 'OR', true );
     }
 
     /**
      * Add an "ends with" search (prepends % to term).
      */
-    public function where_ends_with( string $column, string $value, string $boolean = 'AND' ) : static {
-        return $this->where_like( $column, '%' . $this->escape_like_term( $value ), $boolean );
+    public function where_ends_with( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
+        $pattern = '%' . $this->escape_like_term( $value );
+        return $this->where_like( $column, $pattern, $boolean, $not, true );
     }
 
     /**
+     * Add a "NOT ends with" search.
+     */
+    public function where_not_ends_with( string $column, string $value ) : static {
+        return $this->where_ends_with( $column, $value, 'AND', true );
+    }
+
+    /**
+     * Add an "OR ends with" search.
+     */
+    public function or_where_ends_with( string $column, string $value ) : static {
+        return $this->where_ends_with( $column, $value, 'OR' );
+    }
+
+    /**
+     * Add an "OR NOT ends with" search.
+     */
+    public function or_where_not_ends_with( string $column, string $value ) : static {
+        return $this->where_ends_with( $column, $value, 'OR', true );
+    }
+    
+    /**
      * Escapes the internal search term to prevent user-injected wildcards.
      * Standardizes on '=' as the framework escape character.
-     * 
-     * @param string $term
+     * * @param string $term
      * @return string
      */
-    protected function escape_like_term( string $term ) : string {
+    public function escape_like_term( string $term ) : string {
         return str_replace( ['=', '%', '_'], ['==', '=%', '=_'], $term );
     }
 
@@ -311,35 +390,33 @@ trait QueryCriteriaTrait {
      * * This ensures that edge wildcards ('%' or '_') are preserved as functional SQL rules,
      * while any internal wildcards or escape characters within the actual search phrase 
      * are cleanly isolated.
-     * 
-     * @param string $value The raw pattern string (e.g., '%10% off%').
+     * * @param string $value The raw pattern string (e.g., '%10% off%').
      * @return string The cross-engine sanitized pattern string.
      */
-    protected function escape_like_value( string $value ) : string {
+    public function escape_like_value( string $value ) : string {
         if ( '' === $value ) {
             return '';
         }
 
-        $left_wildcard  = '';
-        $right_wildcard = '';
-
-        // Strip and record the functional trailing wildcard if it exists.
-        if ( str_ends_with( $value, '%' ) || str_ends_with( $value, '_' ) ) {
-            $right_wildcard = substr( $value, -1 );
-            $value          = substr( $value, 0, -1 );
+        // Capture any sequence of leading wildcards.
+        $left_wildcards = '';
+        while ( str_starts_with( $value, '%' ) || str_starts_with( $value, '_' ) ) {
+            $left_wildcards .= substr( $value, 0, 1 );
+            $value = substr( $value, 1 );
         }
 
-        // Strip and record the functional leading wildcard if it exists.
-        if ( str_starts_with( $value, '%' ) || str_starts_with( $value, '_' ) ) {
-            $left_wildcard = substr( $value, 0, 1 );
-            $value         = substr( $value, 1 );
+        // Capture any sequence of trailing wildcards.
+        $right_wildcards = '';
+        while ( str_ends_with( $value, '%' ) || str_ends_with( $value, '_' ) ) {
+            $right_wildcards = substr( $value, -1 ) . $right_wildcards;
+            $value = substr( $value, 0, -1 );
         }
 
-        // The remaining core string is pure text literal; escape it canonically.
+        // The remaining core text is literal text; escape it canonically.
         $escaped_core = str_replace( ['=', '%', '_'], ['==', '=%', '=_'], $value );
 
-        // Reassemble the safe, cross-engine bound payload.
-        return $left_wildcard . $escaped_core . $right_wildcard;
+        // Reassemble the clean string pattern payload.
+        return $left_wildcards . $escaped_core . $right_wildcards;
     }
 
     /**
