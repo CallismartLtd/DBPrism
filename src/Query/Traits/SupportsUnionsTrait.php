@@ -10,7 +10,7 @@ trait SupportsUnionsTrait {
     /**
      * The orchestrating builder factory instance.
      *
-     * @var SQLBuilder
+     * @var SQLBuilder $builder
      */
     protected SQLBuilder $builder;
     

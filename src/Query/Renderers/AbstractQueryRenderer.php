@@ -434,10 +434,16 @@ abstract class AbstractQueryRenderer {
                     $this->quote_identifier( $condition['column'] ),
                     $condition['not'] ? 'NOT ' : ''
                 ),
+                
+                'Like'      => sprintf(
+                    "%s %sLIKE ? ESCAPE '='",
+                    $this->quote_identifier( $condition['column'] ),
+                    $condition['not'] ? 'NOT ' : ''
+                ),
 
                 'Raw' => $condition['expression'],
 
-                default => throw new \InvalidArgumentException( "Unsupported condition type: {$condition['type']}" )
+                default => throw new \InvalidArgumentException( "Unsupported condition type: \"{$condition['type']}\"" )
             };
 
             $parts[] = $connector . $clause;

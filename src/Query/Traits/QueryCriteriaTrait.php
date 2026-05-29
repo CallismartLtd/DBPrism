@@ -245,6 +245,104 @@ trait QueryCriteriaTrait {
     }
 
     /**
+     * Add a basic WHERE LIKE clause with automatic value escaping.
+     * 
+     * @param string $column   The target column.
+     * @param string $value    The search pattern (e.g., '%term%').
+     * @param string $boolean  Logical connector (AND / OR).
+     * @param bool   $not      Whether to negate (NOT LIKE).
+     * @return static
+     */
+    public function where_like( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
+        $this->conditions[] = [
+            'type'    => 'Like',
+            'column'  => $column,
+            'boolean' => $boolean,
+            'not'     => $not
+        ];
+
+        // Ensure literal % and _ in user input are escaped using '='
+        $this->bindings[] = $this->escape_like_value( $value );
+
+        return $this;
+    }
+
+    /**
+     * Add a WHERE NOT LIKE clause.
+     */
+    public function where_not_like( string $column, string $value ) : static {
+        return $this->where_like( $column, $value, 'AND', true );
+    }
+
+    /**
+     * Add a "contains" search (wraps term in % %).
+     */
+    public function where_contains( string $column, string $value, string $boolean = 'AND' ) : static {
+        return $this->where_like( $column, '%' . $this->escape_like_term( $value ) . '%', $boolean );
+    }
+
+    /**
+     * Add a "starts with" search (appends % to term).
+     */
+    public function where_starts_with( string $column, string $value, string $boolean = 'AND' ) : static {
+        return $this->where_like( $column, $this->escape_like_term( $value ) . '%', $boolean );
+    }
+
+    /**
+     * Add an "ends with" search (prepends % to term).
+     */
+    public function where_ends_with( string $column, string $value, string $boolean = 'AND' ) : static {
+        return $this->where_like( $column, '%' . $this->escape_like_term( $value ), $boolean );
+    }
+
+    /**
+     * Escapes the internal search term to prevent user-injected wildcards.
+     * Standardizes on '=' as the framework escape character.
+     * 
+     * @param string $term
+     * @return string
+     */
+    protected function escape_like_term( string $term ) : string {
+        return str_replace( ['=', '%', '_'], ['==', '=%', '=_'], $term );
+    }
+
+    /**
+     * Parse and escape an explicit developer-provided LIKE pattern.
+     * * This ensures that edge wildcards ('%' or '_') are preserved as functional SQL rules,
+     * while any internal wildcards or escape characters within the actual search phrase 
+     * are cleanly isolated.
+     * 
+     * @param string $value The raw pattern string (e.g., '%10% off%').
+     * @return string The cross-engine sanitized pattern string.
+     */
+    protected function escape_like_value( string $value ) : string {
+        if ( '' === $value ) {
+            return '';
+        }
+
+        $left_wildcard  = '';
+        $right_wildcard = '';
+
+        // Strip and record the functional trailing wildcard if it exists.
+        if ( str_ends_with( $value, '%' ) || str_ends_with( $value, '_' ) ) {
+            $right_wildcard = substr( $value, -1 );
+            $value          = substr( $value, 0, -1 );
+        }
+
+        // Strip and record the functional leading wildcard if it exists.
+        if ( str_starts_with( $value, '%' ) || str_starts_with( $value, '_' ) ) {
+            $left_wildcard = substr( $value, 0, 1 );
+            $value         = substr( $value, 1 );
+        }
+
+        // The remaining core string is pure text literal; escape it canonically.
+        $escaped_core = str_replace( ['=', '%', '_'], ['==', '=%', '=_'], $value );
+
+        // Reassemble the safe, cross-engine bound payload.
+        return $left_wildcard . $escaped_core . $right_wildcard;
+    }
+
+    /**
      * Get tracked parameters.
      * 
      * @return array

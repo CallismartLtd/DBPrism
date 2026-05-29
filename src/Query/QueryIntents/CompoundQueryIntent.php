@@ -45,7 +45,7 @@ class CompoundQueryIntent implements QueryIntentInterface {
     /**
      * The orchestrating builder factory instance.
      *
-     * @var SQLBuilder
+     * @var SQLBuilder $builder
      */
     protected SQLBuilder $builder;
 
