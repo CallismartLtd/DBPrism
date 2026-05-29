@@ -269,27 +269,48 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an OR WHERE LIKE clause.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search pattern.
+     * @param bool   $is_pre_escaped Internal flag to skip double-escaping from helpers.
+     * @return static
      */
-    public function or_where_like( string $column, string $value ) : static {
-        return $this->where_like( $column, $value, 'OR' );
+    public function or_where_like( string $column, string $value, bool $is_pre_escaped = false ) : static {
+        return $this->where_like( $column, $value, 'OR', false, $is_pre_escaped );
     }
 
     /**
      * Add a WHERE NOT LIKE clause.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search pattern.
+     * @param bool   $is_pre_escaped Internal flag to skip double-escaping from helpers.
+     * @return static
      */
-    public function where_not_like( string $column, string $value ) : static {
-        return $this->where_like( $column, $value, 'AND', true );
+    public function where_not_like( string $column, string $value, bool $is_pre_escaped = false ) : static {
+        return $this->where_like( $column, $value, 'AND', true, $is_pre_escaped );
     }
 
     /**
      * Add an OR WHERE NOT LIKE clause.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search pattern.
+     * @param bool   $is_pre_escaped Internal flag to skip double-escaping from helpers.
+     * @return static
      */
-    public function or_where_not_like( string $column, string $value ) : static {
-        return $this->where_like( $column, $value, 'OR', true );
+    public function or_where_not_like( string $column, string $value, bool $is_pre_escaped = false ) : static {
+        return $this->where_like( $column, $value, 'OR', true, $is_pre_escaped );
     }
 
     /**
      * Add a "contains" search (wraps term in % %).
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term (will be escaped).
+     * @param string $boolean Logical connector (AND / OR).
+     * @param bool   $not    Whether to negate (NOT LIKE).
+     * @return static
      */
     public function where_contains( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
         $pattern = '%' . $this->escape_like_term( $value ) . '%';
@@ -298,6 +319,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a "NOT contains" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function where_not_contains( string $column, string $value ) : static {
         return $this->where_contains( $column, $value, 'AND', true );
@@ -305,6 +330,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR contains" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_contains( string $column, string $value ) : static {
         return $this->where_contains( $column, $value, 'OR' );
@@ -312,6 +341,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR NOT contains" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_not_contains( string $column, string $value ) : static {
         return $this->where_contains( $column, $value, 'OR', true );
@@ -319,6 +352,12 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a "starts with" search (appends % to term).
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @param string $boolean Logical connector (AND / OR).
+     * @param bool   $not    Whether to negate (NOT LIKE).
+     * @return static
      */
     public function where_starts_with( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
         $pattern = $this->escape_like_term( $value ) . '%';
@@ -327,6 +366,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a "NOT starts with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function where_not_starts_with( string $column, string $value ) : static {
         return $this->where_starts_with( $column, $value, 'AND', true );
@@ -334,6 +377,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR starts with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_starts_with( string $column, string $value ) : static {
         return $this->where_starts_with( $column, $value, 'OR' );
@@ -341,6 +388,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR NOT starts with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_not_starts_with( string $column, string $value ) : static {
         return $this->where_starts_with( $column, $value, 'OR', true );
@@ -348,6 +399,12 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "ends with" search (prepends % to term).
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @param string $boolean Logical connector (AND / OR).
+     * @param bool   $not    Whether to negate (NOT LIKE).
+     * @return static
      */
     public function where_ends_with( string $column, string $value, string $boolean = 'AND', bool $not = false ) : static {
         $pattern = '%' . $this->escape_like_term( $value );
@@ -356,6 +413,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a "NOT ends with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function where_not_ends_with( string $column, string $value ) : static {
         return $this->where_ends_with( $column, $value, 'AND', true );
@@ -363,6 +424,10 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR ends with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_ends_with( string $column, string $value ) : static {
         return $this->where_ends_with( $column, $value, 'OR' );
@@ -370,11 +435,15 @@ trait QueryCriteriaTrait {
 
     /**
      * Add an "OR NOT ends with" search.
+     * 
+     * @param string $column The target column.
+     * @param string $value  The search term.
+     * @return static
      */
     public function or_where_not_ends_with( string $column, string $value ) : static {
         return $this->where_ends_with( $column, $value, 'OR', true );
     }
-    
+
     /**
      * Escapes the internal search term to prevent user-injected wildcards.
      * Standardizes on '=' as the framework escape character.
