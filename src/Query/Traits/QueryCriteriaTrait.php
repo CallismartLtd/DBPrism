@@ -571,11 +571,11 @@ trait QueryCriteriaTrait {
             );
         }
 
-        $builder            = new SQLBuilder( $this->builder->get_engine() );
-        $selection_intent   = SelectionIntent::make( $builder );
+        $new_builder        = new SQLBuilder( $this->builder->get_engine() );
+        $selection_intent   = SelectionIntent::make( $new_builder );
 
-        $builder->set_type( 'SELECT' );
-        $builder->set_active_intent( $selection_intent );
+        $new_builder->set_type( 'SELECT' );
+        $new_builder->set_active_intent( $selection_intent );
 
         return $selection_intent;
 
