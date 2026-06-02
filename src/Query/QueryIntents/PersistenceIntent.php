@@ -161,8 +161,4 @@ class PersistenceIntent implements QueryIntentInterface {
 
         return $static;
     }
-
-    public function new_instance() : static {
-        return $this->make( $this->table_name, $this->builder );
-    }
 }

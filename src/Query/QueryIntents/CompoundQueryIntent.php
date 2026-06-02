@@ -41,13 +41,6 @@ class CompoundQueryIntent implements QueryIntentInterface {
      * @var QueryIntentInterface
      */
     protected QueryIntentInterface $primary_intent;
-    
-    /**
-     * The orchestrating builder factory instance.
-     *
-     * @var SQLBuilder $builder
-     */
-    protected SQLBuilder $builder;
 
     /**
      * Pre-normalized outer selection contexts for wrapping the compound query.
@@ -217,14 +210,5 @@ class CompoundQueryIntent implements QueryIntentInterface {
         // as they are context-specific and should not be shared across clones.
         $this->outer_selections = [];
         $this->wrapper_alias    = null;
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * @throws \BadMethodCallException Compound query environments cannot be dynamically cloned without explicit boundaries.
-     */
-    public function new_instance() : static {
-        throw new \BadMethodCallException( sprintf( 'The %s context cannot be duplicated as an isolated fresh instance.', self::class ) );
     }
 }

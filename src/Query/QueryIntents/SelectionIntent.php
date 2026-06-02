@@ -16,6 +16,7 @@ use Callismart\DBPrism\Query\SQLBuilder;
 use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
+use Callismart\DBPrism\Query\Traits\SupportsJoinsTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
 use Callismart\DBPrism\Utils\LockMode;
@@ -31,7 +32,7 @@ use Callismart\DBPrism\Utils\LockMode;
 class SelectionIntent implements QueryIntentInterface{
     use QueryCriteriaTrait, SQLBuilderStrategyTrait,
     SupportsUnionsTrait, SupportsGroupingTrait, SupportsOrderingTrait,
-    SupportsSlicingTrait, ColumnNormalizerTrait;
+    SupportsSlicingTrait, SupportsJoinsTrait, ColumnNormalizerTrait;
 
     /**
      * @var array $columns Columns to be selected.
@@ -42,21 +43,6 @@ class SelectionIntent implements QueryIntentInterface{
      * @var string $table_name The primary table for the FROM clause.
      */
     protected string $table_name = '';
-
-    /**
-     * @var array $joins Structured join definitions.
-     */
-    protected array $joins = [];
-
-    /**
-     * @var int|null $limit Maximum number of rows to return.
-     */
-    protected ?int $limit = null;
-
-    /**
-     * @var int|null $offset Number of rows to skip.
-     */
-    protected ?int $offset = null;
 
     /**
      * @var bool $distinct
@@ -116,70 +102,6 @@ class SelectionIntent implements QueryIntentInterface{
      */
     public function from( string $table ) : static {
         $this->table_name = $table;
-        return $this;
-    }
-
-    /**
-     * Add an INNER JOIN clause.
-     * 
-     * @param string $table    Table to join.
-     * @param string $first    First column in condition.
-     * @param string $operator Comparison operator.
-     * @param string $second   Second column in condition.
-     * @return $this
-     */
-    public function join( string $table, string $first, string $operator, string $second ) : static {
-        return $this->add_join_entry( $table, $first, $operator, $second, 'INNER' );
-    }
-
-    /**
-     * Add a LEFT JOIN clause.
-     * 
-     * @param string $table
-     * @param string $first
-     * @param string $operator
-     * @param string $second
-     * @return $this
-     */
-    public function left_join( string $table, string $first, string $operator, string $second ) : static {
-        return $this->add_join_entry( $table, $first, $operator, $second, 'LEFT' );
-    }
-
-    /**
-     * Add a RIGHT JOIN clause.
-     * 
-     * @param string $table
-     * @param string $first
-     * @param string $operator
-     * @param string $second
-     * @return $this
-     */
-    public function right_join( string $table, string $first, string $operator, string $second ) : static {
-        return $this->add_join_entry( $table, $first, $operator, $second, 'RIGHT' );
-    }
-
-    /**
-     * Add a CROSS JOIN clause.
-     * 
-     * @param string $table
-     * @return $this
-     */
-    public function cross_join( string $table ) : static {
-        return $this->add_join_entry( $table, '', '', '', 'CROSS' );
-    }
-
-    /**
-     * Internal helper to standardize join data structures.
-     * 
-     * @param string $table
-     * @param string $first
-     * @param string $operator
-     * @param string $second
-     * @param string $type
-     * @return $this
-     */
-    protected function add_join_entry( string $table, string $first, string $operator, string $second, string $type ) : static {
-        $this->joins[] = compact( 'table', 'first', 'operator', 'second', 'type' );
         return $this;
     }
 
@@ -282,15 +204,6 @@ class SelectionIntent implements QueryIntentInterface{
     }
 
     /**
-     * Get all defined joins.
-     * 
-     * @return array
-     */
-    public function get_joins() : array {
-        return $this->joins;
-    }
-
-    /**
      * Static factory
      * 
      * @param SQLBuilder $builder
@@ -298,10 +211,6 @@ class SelectionIntent implements QueryIntentInterface{
      */
     public static function make( SQLBuilder $builder ) : static {
         return new static( $builder );
-    }
-
-    public function new_instance() : static {
-        return new static( $this->builder );
     }
 
     public function __clone() : void {

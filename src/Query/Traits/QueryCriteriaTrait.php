@@ -9,6 +9,10 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Query\Traits;
 
+use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
+use Callismart\DBPrism\Query\SQLBuilder;
+use LogicException;
+
 /**
  * Provides fluent methods for building query conditions and managing bindings.
  */
@@ -216,7 +220,7 @@ trait QueryCriteriaTrait {
      * @return static
      */
     public function where_group( callable $callback, string $boolean = 'AND' ) : static {
-        $group = $this->new_instance();
+        $group = $this->get_selection_intent();
 
         $callback( $group );
 
@@ -242,6 +246,52 @@ trait QueryCriteriaTrait {
      */
     public function or_where_group( callable $callback ) : static {
         return $this->where_group( $callback, 'OR' );
+    }
+
+    /**
+     * Add a where exists clause with a closure that receives a new query instance.
+     * 
+     * @param callable $callback Receives a new query instance to build the subquery.
+     * @param string   $boolean  Logical connector (AND / OR).
+     * @param bool     $not      Whether to negate the condition (NOT EXISTS).
+     * @return static
+     */
+    public function where_exists( callable $callback, string $boolean = 'AND', bool $not = false ) : static {        
+        $subquery = $this->get_selection_intent();
+        $callback( $subquery );
+
+        $this->conditions[] = [
+            'type'     => 'Exists',
+            'subquery' => $subquery,
+            'boolean'  => $boolean,
+            'not'      => $not,
+        ];
+
+        foreach ( $subquery->get_bindings() as $binding ) {
+            $this->bindings[] = $binding;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add an OR WHERE EXISTS clause.
+     * 
+     * @param callable $callback
+     * @return static
+     */
+    public function or_where_exists( callable $callback ) : static {
+        return $this->where_exists( $callback, 'OR' );
+    }
+
+    /**
+     * Add a WHERE NOT EXISTS clause.
+     * 
+     * @param callable $callback
+     * @return static
+     */
+    public function where_not_exists( callable $callback ) : static {
+        return $this->where_exists( $callback, 'AND', true );
     }
 
     /**
@@ -506,5 +556,28 @@ trait QueryCriteriaTrait {
         return $this->conditions;
     }
 
-    abstract public function new_instance() : static;
+    /**
+     * Get a new selection intent instance for nested condition building.
+     * 
+     * @return SelectionIntent
+     */
+    protected function get_selection_intent() : SelectionIntent {        
+        if ( ! property_exists( $this, 'builder' ) || ! ( $this->builder instanceof SQLBuilder ) ) {
+            throw new LogicException( 
+                \sprintf( 
+                    'The %s trait requires a $builder property of type %s to create nested query instances.',
+                    static::class, SQLBuilder::class 
+                )
+            );
+        }
+
+        $builder            = new SQLBuilder( $this->builder->get_engine() );
+        $selection_intent   = SelectionIntent::make( $builder );
+
+        $builder->set_type( 'SELECT' );
+        $builder->set_active_intent( $selection_intent );
+
+        return $selection_intent;
+
+    }
 }

@@ -33,6 +33,7 @@ trait SQLBuilderStrategyTrait {
      */
     public function build_raw(): string {
         $sql      = $this->build();
+
         $bindings = $this->get_bindings();
 
         foreach ( $bindings as $value ) {

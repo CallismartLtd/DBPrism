@@ -343,16 +343,19 @@ abstract class AbstractQueryRenderer {
     }
 
     /**
-     * Render a DELETE statement with conditions.
+     * Render a cross-engine compile-safe DELETE statement with conditions.
      * 
      * @param DeleteIntent $intent
      * @return string
      */
     public function render_delete( DeleteIntent $intent ) : string {
-        $table = $this->quote_identifier( $intent->get_table_name() );
-        $sql   = "DELETE FROM {$table}";
-        $conditions = $intent->get_conditions();
+        $quoted_table = $this->quote_identifier( $intent->get_table_name() );
 
+        $conditions   = $intent->get_conditions();
+
+        $sql = "DELETE FROM {$quoted_table}";
+
+        // Compile and append the condition block if filters or subqueries exist
         if ( ! empty( $conditions ) ) {
             $sql .= " WHERE " . $this->render_where_clauses( $conditions );
         }
@@ -399,15 +402,11 @@ abstract class AbstractQueryRenderer {
         return implode(', ', $out);
     }
 
-    /**
-     * Quote an array of identifiers.
-     * 
-     * @param array $identifiers
-     * @return array
-     */
-    protected function quote_identifiers( array $identifiers ) : array {
-        return array_map( [ $this, 'quote_identifier' ], $identifiers );
-    }
+    /*
+    |--------------------------
+    | WHERE CLAUSES RENDERING
+    |--------------------------
+    */
 
     /**
      * Render WHERE clause string from structured conditions.
@@ -420,6 +419,7 @@ abstract class AbstractQueryRenderer {
         $parts = [];
         foreach ( $conditions as $index => $condition ) {
             $connector = ( $index === 0 ) ? '' : " {$condition['boolean']} ";
+
             $clause = match ( $condition['type'] ) {
                 'Basic'     => sprintf( "%s %s ?", $this->quote_identifier( $condition['column'] ), $condition['operator'] ),
                 
@@ -441,6 +441,12 @@ abstract class AbstractQueryRenderer {
                     $condition['not'] ? 'NOT ' : ''
                 ),
 
+                'Exists'    => sprintf(
+                    "%sEXISTS (\n%s\n)",
+                    $condition['not'] ? 'NOT ' : '',
+                    rtrim( $condition['subquery']->build(), ';' )
+                ),
+
                 'Raw' => $condition['expression'],
 
                 default => throw new \InvalidArgumentException( "Unsupported condition type: \"{$condition['type']}\"" )
@@ -448,34 +454,8 @@ abstract class AbstractQueryRenderer {
 
             $parts[] = $connector . $clause;
         }
-        return implode( '', $parts );
-    }
 
-    /**
-     * Render JOIN clauses.
-     * 
-     * @param array $joins
-     * @return string
-     */
-    protected function render_joins( array $joins ) : string {
-        if ( empty( $joins ) ) return '';
-        
-        $sql = [];
-        foreach ( $joins as $join ) {
-            if ( $join['type'] === 'CROSS' ) {
-                $sql[] = sprintf( "CROSS JOIN %s", $this->quote_identifier( $join['table'] ) );
-                continue;
-            }
-            $sql[] = sprintf( 
-                "%s JOIN %s ON %s %s %s", 
-                $join['type'], 
-                $this->quote_identifier( $join['table'] ), 
-                $this->quote_identifier( $join['first'] ), 
-                $join['operator'], 
-                $this->quote_identifier( $join['second'] ) 
-            );
-        }
-        return ' ' . implode( ' ', $sql );
+        return implode( '', $parts );
     }
 
     /**
@@ -513,6 +493,39 @@ abstract class AbstractQueryRenderer {
         );
     }
 
+    /*
+    |--------------------------
+    | JOIN & ORDERING RENDERING
+    |--------------------------
+    */
+
+    /**
+     * Render JOIN clauses.
+     * 
+     * @param array $joins
+     * @return string
+     */
+    protected function render_joins( array $joins ) : string {
+        if ( empty( $joins ) ) return '';
+        
+        $sql = [];
+        foreach ( $joins as $join ) {
+            if ( $join['type'] === 'CROSS' ) {
+                $sql[] = sprintf( "CROSS JOIN %s", $this->quote_identifier( $join['table'] ) );
+                continue;
+            }
+            $sql[] = sprintf( 
+                "%s JOIN %s ON %s %s %s", 
+                $join['type'], 
+                $this->quote_identifier( $join['table'] ), 
+                $this->quote_identifier( $join['first'] ), 
+                $join['operator'], 
+                $this->quote_identifier( $join['second'] ) 
+            );
+        }
+        return ' ' . implode( ' ', $sql );
+    }
+
     /**
      * Render ORDER BY clause.
      * 
@@ -543,24 +556,56 @@ abstract class AbstractQueryRenderer {
 
     /**
      * Quote a database identifier, handling dot notation and aliases.
-     * 
-     * @param string $identifier
+     * * @param string $identifier
      * @return string
      */
     public function quote_identifier( string $identifier ) : string {
-        if ( $identifier === '*' ) return '*';
-
-        if ( str_contains( $identifier, ' ' ) ) {
-            $parts = explode( ' ', $identifier );
-            return $this->quote_identifier( $parts[0] ) . ' ' . $this->quote_identifier( $parts[1] );
+        $identifier = trim( $identifier );
+        
+        // 1. If it's a global wildcard, do not quote it.
+        if ( $identifier === '*' ) {
+            return '*';
         }
 
+        // 2. Explicitly guard table wildcards like "m.*"
+        if ( str_ends_with( $identifier, '.*' ) ) {
+            $prefix = substr( $identifier, 0, -2 );
+            return $this->quote_identifier( $prefix ) . '.*';
+        }
+
+        // 3. Handle explicit aliases (e.g., "table_name AS alias" or "table_name alias")
+        // Handles multiple spaces seamlessly by filtering empty parts
+        if ( str_contains( $identifier, ' ' ) ) {
+            $parts = array_values( array_filter( explode( ' ', $identifier ) ) );
+            
+            // If it's explicitly "table AS alias"
+            if ( isset( $parts[1] ) && strtolower( $parts[1] ) === 'as' ) {
+                return $this->quote_identifier( $parts[0] ) . ' AS ' . $this->quote_identifier( $parts[2] );
+            }
+            
+            // Otherwise, it's an implicit space alias "table alias"
+            if ( count( $parts ) === 2 ) {
+                return $this->quote_identifier( $parts[0] ) . ' ' . $this->quote_identifier( $parts[1] );
+            }
+        }
+
+        // 4. Handle nested dot notation namespaces (e.g., "database.table")
         if ( str_contains( $identifier, '.' ) ) {
-            $parts = array_map( [ $this, 'quote_single_identifier' ], explode( '.', $identifier ) );
+            $parts = array_map( [ $this, 'quote_identifier' ], explode( '.', $identifier ) );
             return implode( '.', $parts );
         }
 
         return $this->quote_single_identifier( $identifier );
+    }
+
+    /**
+     * Quote an array of identifiers.
+     * 
+     * @param array $identifiers
+     * @return array
+     */
+    protected function quote_identifiers( array $identifiers ) : array {
+        return array_map( [ $this, 'quote_identifier' ], $identifiers );
     }
 
     /**

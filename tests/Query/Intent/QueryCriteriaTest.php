@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace CallismartDBPrism\Tests\Query\Intent;
 
+use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use PHPUnit\Framework\TestCase;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
+
+use function Callismart\DBPrism\tests\queryBuilder;
 
 /**
  * Concrete Stub class to enable clean isolate-testing of the QueryCriteriaTrait.
  */
 class QueryCriteriaStub {
     use QueryCriteriaTrait;
-
-    /**
-     * Fulfill the abstract boundary instantiator factory requirement.
-     */
-    public function new_instance() : static {
-        return new static();
-    }
 }
 
 /**

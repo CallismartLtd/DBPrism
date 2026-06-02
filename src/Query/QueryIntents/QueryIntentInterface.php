@@ -10,11 +10,6 @@ namespace Callismart\DBPrism\Query\QueryIntents;
 
 interface QueryIntentInterface {
     /**
-     * Reconstruct a new self using existing factory methods
-     */
-    public function new_instance() : static;
-
-    /**
      * Build query.
      * 
      * @return string

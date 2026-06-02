@@ -175,11 +175,9 @@ final class CompoundQueryIntentTest extends TestCase {
         $q1 = queryBuilder()->select( '*' )->from( 'wp_smliser_plugins' );
         $q2 = queryBuilder()->select( '*' )->from( 'wp_smliser_themes' );
 
-        $compound = $q1->union_all( $q2 );
+        $q1->union_all( $q2 );
 
         $this->expectException( \BadMethodCallException::class );
         $this->expectExceptionMessage( 'CompoundQueryIntent context cannot be duplicated' );
-
-        $compound->new_instance();
     }
 }
