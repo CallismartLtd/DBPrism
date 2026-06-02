@@ -447,6 +447,13 @@ abstract class AbstractQueryRenderer {
                     rtrim( $condition['subquery']->build(), ';' )
                 ),
 
+                'Column' => sprintf(
+                    "%s %s %s",
+                    $this->quote_identifier( $condition['first_column'] ),
+                    $condition['operator'],
+                    $this->quote_identifier( $condition['second_column'] )
+                ),
+
                 'Raw' => $condition['expression'],
 
                 default => throw new \InvalidArgumentException( "Unsupported condition type: \"{$condition['type']}\"" )

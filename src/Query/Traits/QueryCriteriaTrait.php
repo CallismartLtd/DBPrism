@@ -51,6 +51,29 @@ trait QueryCriteriaTrait {
     }
 
     /**
+     * Add a column-to-column comparison filter layer.
+     * 
+     * @param string $first_column
+     * @param string $operator
+     * @param string $second_column
+     * @param string $boolean
+     * @return static
+     */
+    public function where_column( string $first_column, string $operator, string $second_column, string $boolean = 'AND' ) : static {
+        $this->conditions[] = [
+            'type'          => 'Column',
+            'first_column'  => $first_column,
+            'operator'      => $operator,
+            'second_column' => $second_column,
+            'boolean'       => $boolean
+        ];
+
+        // Note: No values are added to $this->bindings 
+        // because columns are not parameters!
+        return $this;
+    }
+
+    /**
      * Add an OR WHERE clause.
      * 
      * @param string $column
