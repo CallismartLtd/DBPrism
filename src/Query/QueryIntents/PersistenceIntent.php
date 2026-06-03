@@ -11,6 +11,7 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\QueryIntents;
 
 use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
 use InvalidArgumentException;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
@@ -25,7 +26,8 @@ use Callismart\DBPrism\Utils\CaseExpression;
  * @since 0.2.0
  */
 class PersistenceIntent implements QueryIntentInterface {
-    use QueryCriteriaTrait, SQLBuilderStrategyTrait, SupportsUnionsTrait;
+    use QueryCriteriaTrait, SQLBuilderStrategyTrait, SupportsUnionsTrait,
+    ColumnNormalizerTrait;
     /**
      * @var string $table_name The target table name.
      */
@@ -83,6 +85,7 @@ class PersistenceIntent implements QueryIntentInterface {
         }
 
         $this->is_multi = false;
+        
         $this->data = array_merge( $this->data, $data );
 
         return $this;
@@ -211,36 +214,47 @@ class PersistenceIntent implements QueryIntentInterface {
         if ( $value instanceof CaseExpression ) {
             $extracted = [];
             foreach ( $value->get_branches() as $branch ) {
-                // A. Pull bindings generated inside the WHEN condition branch sandbox
+                // Pull bindings generated inside the WHEN condition branch sandbox
                 foreach ( $branch['criteria']->get_bindings() as $condition_binding ) {
                     $extracted[] = $condition_binding;
                 }
 
-                // B. Pull the output THEN value if it is an executable parameter
-                if ( ! is_object( $branch['then_value'] ) ) {
+                // Pull the output THEN value if it is an executable parameter
+                if ( ! is_object( $branch['then_value'] ) && $this->should_bind_value( $branch['then_value'] ) ) {
                     $extracted[] = $branch['then_value'];
                 }
             }
 
             // C. Pull the final fallback ELSE binding if present
             $else_value = $value->get_else();
-            if ( null !== $else_value && ! is_object( $else_value ) ) {
+            if ( null !== $else_value && ! is_object( $else_value ) && $this->should_bind_value( $else_value ) ) {
                 $extracted[] = $else_value;
             }
 
             return $extracted;
         }
 
-        // Standard plain text parameters or objects (like raw expression tokens)
-        return is_object( $value ) ? [] : [ $value ];
+        // Standard scalars or raw expression tokens
+        if ( is_object( $value ) || ! $this->should_bind_value( $value ) ) {
+            return [];
+        }
+
+        return [ $value ];
     }
 
-    private function flatten_multi_data() : array {
-        $flat = [];
-        foreach ( $this->data as $row ) {
-            foreach ( $row as $val ) $flat[] = $val;
+    /**
+     * Determine if a value should be added to the parameter bindings array.
+     * 
+     * @param mixed $value
+     * @return bool
+     */
+    protected function should_bind_value( mixed $value ) : bool {
+        // If it's a string expression or function call, bypass parameterization
+        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
+            return false;
         }
-        return $flat;
+        
+        return true;
     }
 
     /**

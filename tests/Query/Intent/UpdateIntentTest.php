@@ -176,4 +176,93 @@ final class UpdateIntentTest extends TestCase {
             $query->get_bindings()
         );
     }
+
+    /**
+     * Verify that UPDATE operations completely protect functional SQL expressions
+     * inside the data assignment payload from being bound as variable parameters.
+     */
+    public function test_update_payload_protects_sql_expressions_from_bindings(): void {
+
+        $query = queryBuilder()
+            ->update('smwoo_licenses')
+            ->set([
+                'status'     => 'expired',
+                'updated_at' => 'NOW()',            // Expression: Should NOT bind!
+                'score'      => 'COALESCE(score, 0)' // Expression: Should NOT bind!
+            ])
+            ->where('id', '=', 10);
+
+        // 1. Data assignment parameter stream must strictly isolate data elements
+        $this->assertSame(
+            [
+                'expired',
+                10
+            ],
+            $query->get_bindings()
+        );
+
+        // 2. State dictionary metadata payload must remain unmutated for the compiler
+        $data = $query->get_data();
+        $this->assertSame('NOW()', $data['updated_at']);
+        $this->assertSame('COALESCE(score, 0)', $data['score']);
+    }
+
+    /**
+     * Verify that dynamic set_case blocks cleanly evaluate conditional paths,
+     * stripping out raw expression tokens from THEN/ELSE branches uniformly.
+     */
+    public function test_update_set_case_filters_branch_expressions(): void {
+
+        $query = queryBuilder()
+            ->update('smwoo_licenses')
+            ->set_case('quota_tier', function ($case) {
+                $case->when(fn($q) => $q->where('manager_tier', '=', 'Senior'), 'COUNT(id)') // Expression branch
+                     ->else(50);
+            })
+            ->where('status', '=', 'active');
+
+        // Only 'Senior', 50, and 'active' are parameters; 'COUNT(id)' is bypassed!
+        $this->assertSame(
+            [
+                'Senior',
+                50,
+                'active'
+            ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Stress: Complex relational scenario combining explicit column updates,
+     * dynamic functional calculations, custom conditional cases, and subqueries together.
+     */
+    public function test_massive_composite_update_alignment_tree(): void {
+
+        $query = queryBuilder()
+            ->update('smwoo_licenses')
+            ->set([
+                'status'     => 'provisioned',
+                'updated_at' => 'NOW()' // Expression bypass
+            ])
+            ->set_case('priority_index', function ($case) {
+                $case->when(fn($q) => $q->where('tier_level', '=', 'Platinum'), 99)
+                     ->else('LOWER(default_index)'); // Expression bypass
+            })
+            ->where_in_subquery('owner_id', function ($subquery) {
+                $subquery->select('id')
+                         ->from('wp_users')
+                         ->where('role', '=', 'administrator');
+            });
+
+        // Verifying chronological binding extraction remains absolutely synchronous
+        $this->assertSame(
+            [
+                'provisioned',   // 1. Plain SET data value
+                'Platinum',      // 2. Case Branch condition assignment
+                99,              // 3. Case Branch THEN outcome parameter
+                'administrator'  // 4. Subquery selector evaluation parameter
+            ],
+            $query->get_bindings()
+        );
+    }
 }

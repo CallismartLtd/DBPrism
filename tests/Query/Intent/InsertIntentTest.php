@@ -136,4 +136,67 @@ final class InsertIntentTest extends TestCase {
             ->insert('smwoo_licenses')
             ->multi_values([]);
     }
+
+    /**
+     * Verify single-row values filter out functional SQL expressions from parameter bindings, 
+     * but preserve them raw within structural record payloads.
+     */
+    public function test_insert_values_protects_sql_expressions_from_bindings(): void {
+
+        $query = queryBuilder()
+            ->insert('smwoo_licenses')
+            ->values([
+                'license_key' => 'SMW-123-ABC',
+                'status'      => 'active',
+                'created_at'  => 'NOW()' // Expression: Should NOT bind!
+            ]);
+
+        // 1. Parameter tracking array should strictly skip the expression string
+        $this->assertSame(
+            [
+                'SMW-123-ABC',
+                'active'
+            ],
+            $query->get_bindings()
+        );
+
+        // 2. Original structural payload data must still contain the string representation
+        $this->assertSame(
+            [
+                'license_key' => 'SMW-123-ABC',
+                'status'      => 'active',
+                'created_at'  => 'NOW()'
+            ],
+            $query->get_data()
+        );
+    }
+
+    /**
+     * Verify multi-row insertions correctly analyze internal matrices, stripping out 
+     * structural expressions from flattened streaming bindings uniformly.
+     */
+    public function test_multi_values_insert_skips_nested_expressions(): void {
+
+        $query = queryBuilder()
+            ->insert('smwoo_licenses')
+            ->multi_values([
+                [
+                    'license_key' => 'KEY-1',
+                    'created_at'  => 'NOW()' // Expression: Skip
+                ],
+                [
+                    'license_key' => 'KEY-2',
+                    'created_at'  => 'LOWER(field)' // Expression: Skip
+                ]
+            ]);
+
+        // Streaming positional elements must keep positions clean and balanced
+        $this->assertSame(
+            [
+                'KEY-1',
+                'KEY-2'
+            ],
+            $query->get_bindings()
+        );
+    }
 }

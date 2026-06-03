@@ -299,4 +299,90 @@ final class SelectionIntentTest extends TestCase {
             $query->get_bindings()
         );
     }
+
+    /**
+     * Test that standard columns/values are parameterized, 
+     * but SQL functional expressions are bypassed from bindings.
+     */
+    public function test_where_clause_protects_sql_expressions_from_bindings() : void {
+
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'calldbal_licenses' )
+            ->where( 'status', '=', 'active' )
+            ->where( 'expires_at', '>', 'NOW()' )         // Expression: Skip binding
+            ->where( 'seats', '>', 'SUM(legacy_seats)' )  // Expression: Skip binding
+            ->where( 'tier_id', '=', 5 );
+
+        $this->assertSame(
+            [ 'active', 5 ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Test that mixed entries in an IN expression skip binding functional expressions
+     * but preserve native scalar variable mapping tracking.
+     */
+    public function test_where_in_handles_mixed_expressions_and_values() : void {
+
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'wp_users' )
+            ->where_in( 'region', [ 'North', 'LOWER(fallback_field)', 'South' ] );
+
+        $this->assertSame(
+            [ 'North', 'South' ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Test that nested subqueries inside a WHERE IN clause bubble up their child
+     * bindings sequentially into the parent tree root.
+     */
+    public function test_where_in_subquery_bubbles_nested_bindings_chronologically() : void {
+
+        $query = queryBuilder()
+            ->select( 'name' )
+            ->from( 'wp_users' )
+            ->where( 'status', '=', 'active' )
+            ->where_in_subquery( 'role_id', function( $subquery ) {
+                $subquery->select( 'id' )
+                    ->from( 'wp_roles' )
+                    ->where( 'tier', '=', 'Admin' );
+            })
+            ->where( 'profile_completed', '=', 1 );
+
+        $this->assertSame(
+            [ 'active', 'Admin', 1 ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Stress: Massive mixed tree running standard variables, grouped closures, 
+     * expressions, and isolated subqueries combined.
+     */
+    public function test_massive_composite_expression_tree() : void {
+
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'calldbal_licenses' )
+            ->where( 'is_active', '=', 1 )
+            ->where( 'created_at', '<', 'NOW()' ) // Expression bypass
+            ->where_group( function( $q ) {
+                $q->where_in( 'type', [ 'pro', 'LOWER(custom_type)', 'enterprise' ] ) // 1 Expression
+                  ->or_where_in_subquery( 'owner_id', function( $subquery ) {
+                      $subquery->select( 'id' )
+                          ->from( 'wp_users' )
+                          ->where( 'role', '=', 'administrator' );
+                  });
+            });
+
+        $this->assertSame(
+            [ 1, 'pro', 'enterprise', 'administrator' ],
+            $query->get_bindings()
+        );
+    }
 }

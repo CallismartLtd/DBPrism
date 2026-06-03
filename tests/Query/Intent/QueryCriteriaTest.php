@@ -252,6 +252,92 @@ class QueryCriteriaTest extends TestCase {
     }
 
     /**
+     * Verify basic where updates safely handle raw functional strings by 
+     * recording structural payload criteria but blocking tracking assignments.
+     */
+    public function test_where_clause_intercepts_and_filters_sql_expressions() : void {
+        $this->criteria->where( 'status', '=', 'active' )
+                       ->where( 'updated_at', '>', 'NOW()' )         // Expression: Block parameter
+                       ->where( 'score', '<', 'AVG(total_score)' )    // Expression: Block parameter
+                       ->where( 'limit_bound', '=', 25 );
+
+        $conditions = $this->criteria->get_conditions();
+        $bindings   = $this->get_flat_bindings( $this->criteria->get_bindings() );
+
+        $this->assertCount( 4, $conditions );
+        $this->assertSame( ['active', 25], $bindings );
+
+        $this->assertSame( 'Basic', $conditions[1]['type'] );
+        $this->assertSame( 'NOW()', $conditions[1]['value'] );
+        $this->assertSame( 'AVG(total_score)', $conditions[2]['value'] );
+    }
+
+    /**
+     * Verify that mixed collections within a standard IN clause isolate structural expressions
+     * while accurately preserving standard scalar configurations.
+     */
+    public function test_where_in_filters_expressions_within_value_arrays() : void {
+        $this->criteria->where_in( 'region', ['North', 'LOWER(fallback_field)', 'South'] );
+
+        $conditions = $this->criteria->get_conditions();
+        $bindings   = $this->get_flat_bindings( $this->criteria->get_bindings() );
+
+        $this->assertCount( 1, $conditions );
+        $this->assertSame( ['North', 'South'], $bindings );
+        $this->assertSame( ['North', 'LOWER(fallback_field)', 'South'], $conditions[0]['values'] );
+    }
+
+    /**
+     * Verify that where_in_subquery structures register proper relational payload descriptors
+     * and bubble nested criteria parameter bindings chronologically.
+     */
+    public function test_where_in_subquery_registrations_and_nested_binding_bubbling() : void {
+        $this->criteria->where( 'scope', '=', 'global' )
+                       ->where_in_subquery( 'role_id', function( SelectionIntent $subquery ) {
+                           $subquery->select( 'id' )
+                                    ->from( 'wp_roles' )
+                                    ->where( 'tier_level', '=', 'Admin' );
+                       } )
+                       ->or_where_not_in_subquery( 'status_code', function( SelectionIntent $subquery ) {
+                           $subquery->select( 'code' )
+                                    ->from( 'wp_statuses' )
+                                    ->where( 'is_archived', '=', 1 );
+                       } );
+
+        $conditions = $this->criteria->get_conditions();
+        $bindings   = $this->get_flat_bindings( $this->criteria->get_bindings() );
+
+        $this->assertCount( 3, $conditions );
+        
+        // Assert chronological parameter flow matches exactly
+        $this->assertSame( ['global', 'Admin', 1], $bindings );
+
+        // Validate first subquery condition structure
+        $this->assertSame( 'InSubquery', $conditions[1]['type'] );
+        $this->assertSame( 'role_id', $conditions[1]['column'] );
+        $this->assertSame( 'AND', $conditions[1]['boolean'] );
+        $this->assertFalse( $conditions[1]['not'] );
+        $this->assertInstanceOf( SelectionIntent::class, $conditions[1]['subquery'] );
+
+        // Validate second subquery configuration modifications
+        $this->assertSame( 'InSubquery', $conditions[2]['type'] );
+        $this->assertSame( 'status_code', $conditions[2]['column'] );
+        $this->assertSame( 'OR', $conditions[2]['boolean'] );
+        $this->assertTrue( $conditions[2]['not'] );
+    }
+
+    /**
+     * Verify that where_like captures raw functional configurations and registers them via
+     * 'expression_value' metadata properties instead of polluting standard string bindings.
+     */
+    public function test_where_like_expression_interception_metadata_registration() : void {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'LIKE value must be a scalar parameter.' );
+
+        $this->criteria->where_like( 'computed_hash', 'SUM(amount)' );
+    }
+
+    /**
      * Helper to reliably flatten the parameter array elements across potential type anomalies.
      */
     private function get_flat_bindings( array $bindings ) : array {

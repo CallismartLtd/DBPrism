@@ -153,4 +153,45 @@ final class DeleteIntentTest extends TestCase {
             $query->get_bindings()
         );
     }
+
+    /**
+     * Test that delete queries safely intercept and filter out SQL functional 
+     * expressions within WHERE clauses from the parameters matrix.
+     */
+    public function test_delete_intercepts_and_filters_sql_expressions() : void {
+
+        $query = queryBuilder()
+            ->delete( 'smwoo_licenses' )
+            ->where( 'status', '=', 'expired' )
+            ->where( 'expires_at', '<', 'NOW()' )         // Expression: Skip binding
+            ->where( 'quota', '<', 'AVG(fallback_quota)' ) // Expression: Skip binding
+            ->where( 'force_purge', '=', 1 );
+
+        $this->assertSame(
+            [ 'expired', 1 ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Test that delete queries natively support relational subqueries inside 
+     * where_in_subquery selection blocks, bundling nested bindings sequentially.
+     */
+    public function test_delete_supports_where_in_subquery_binding_bubbling() : void {
+
+        $query = queryBuilder()
+            ->delete( 'wp_users' )
+            ->where( 'status', '=', 'banned' )
+            ->where_in_subquery( 'role_id', function( $subquery ) {
+                $subquery->select( 'id' )
+                    ->from( 'wp_roles' )
+                    ->where( 'tier', '=', 'Guest' );
+            })
+            ->where( 'hard_delete', '=', 1 );
+
+        $this->assertSame(
+            [ 'banned', 'Guest', 1 ],
+            $query->get_bindings()
+        );
+    }
 }
