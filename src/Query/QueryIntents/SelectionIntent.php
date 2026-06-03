@@ -16,9 +16,11 @@ use Callismart\DBPrism\Query\SQLBuilder;
 use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
+use Callismart\DBPrism\Query\Traits\SupportsHavingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsJoinsTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
+use Callismart\DBPrism\Utils\CaseExpression;
 use Callismart\DBPrism\Utils\DefaultColumnValue;
 use Callismart\DBPrism\Utils\LockMode;
 
@@ -33,7 +35,8 @@ use Callismart\DBPrism\Utils\LockMode;
 class SelectionIntent implements QueryIntentInterface{
     use QueryCriteriaTrait, SQLBuilderStrategyTrait,
     SupportsUnionsTrait, SupportsGroupingTrait, SupportsOrderingTrait,
-    SupportsSlicingTrait, SupportsJoinsTrait, ColumnNormalizerTrait;
+    SupportsSlicingTrait, SupportsJoinsTrait, ColumnNormalizerTrait,
+    SupportsHavingTrait;
 
     /**
      * @var array $columns Columns to be selected.
@@ -95,6 +98,48 @@ class SelectionIntent implements QueryIntentInterface{
                 'type'  => 'expression',
                 'value' => DefaultColumnValue::expression( $expr )
             ];
+        }
+
+        return $this;
+    }
+
+    /**
+     * Select ANSI-compliant CASE expressions.
+     * 
+     * @param callable ...$callables Variadic list of closures,
+     * each receiving a clean CaseExpression DTO.
+     * @return static
+     */
+    public function select_case( callable ...$callables ) : static {
+        foreach ( $callables as $callback ) {
+            $case_expression = new CaseExpression();
+            $callback( $case_expression );
+
+            $this->columns[] = [
+                'type'  => 'case_expression',
+                'value' => $case_expression,
+                'alias' => $case_expression->get_alias()
+            ];
+
+            // Cascade inner branch parameters straight up
+            // into the parent binding sequence.
+            foreach ( $case_expression->get_branches() as $branch ) {
+                // Pull bindings generated inside the WHEN condition branch sandbox.
+                foreach ( $branch['criteria']->get_bindings() as $condition_binding ) {
+                    $this->bindings[] = $condition_binding;
+                }
+
+                // Pull the output THEN value if it is an executable parameter.
+                if ( ! is_object( $branch['then_value'] ) ) {
+                    $this->bindings[] = $branch['then_value'];
+                }
+            }
+
+            // Pull the final fallback ELSE binding if present.
+            $else_value = $case_expression->get_else();
+            if ( null !== $else_value && ! is_object( $else_value ) ) {
+                $this->bindings[] = $else_value;
+            }
         }
 
         return $this;
@@ -191,7 +236,12 @@ class SelectionIntent implements QueryIntentInterface{
      * @return array
      */
     public function get_bindings() : array {
-        return $this->bindings;
+        return \array_merge(
+            $this->bindings,
+            $this->groups_bindings,
+            $this->having_bindings,
+            $this->orders_bindings
+        );
     }
 
     /**
@@ -234,5 +284,20 @@ class SelectionIntent implements QueryIntentInterface{
     public function __clone() : void {
         $this->builder = clone $this->builder;
         
+    }
+    
+    /**
+     * Determine if a value should be added to the parameter bindings array.
+     * 
+     * @param mixed $value
+     * @return bool
+     */
+    protected function should_bind_value( mixed $value ) : bool {
+        // If it's a string expression or function call, bypass parameterization
+        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
+            return false;
+        }
+        
+        return true;
     }
 }

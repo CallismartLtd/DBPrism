@@ -18,6 +18,8 @@ use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
 use Callismart\DBPrism\Query\QueryIntents\QueryIntentInterface;
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
+use Callismart\DBPrism\Utils\CaseExpression;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\ColumnType;
 use Callismart\DBPrism\Utils\DefaultColumnValue;
@@ -27,6 +29,7 @@ use Callismart\DBPrism\Utils\LockMode;
  * Provides a blueprint for engine-specific SQL renderers.
  */
 abstract class AbstractQueryRenderer {
+    use ColumnNormalizerTrait;
 
     /**
      * The database engine identifier (e.g., 'mysql', 'sqlite').
@@ -151,6 +154,8 @@ abstract class AbstractQueryRenderer {
 
         $sql .= $this->render_grouping( $intent->get_groups() );
 
+        $sql .= $this->render_havings( $intent->get_havings() );
+
         $sql .= $this->render_ordering( $intent->get_orders() );
 
         $sql .= $this->render_limit_offset( $intent->get_limit(), $intent->get_offset() );
@@ -205,6 +210,9 @@ abstract class AbstractQueryRenderer {
                 // string expressions cleanly.
                 if ( 'expression' === $normalized['type'] ) {
                     $field_sql = $normalized['value'];
+                } elseif ( $normalized['type'] === 'case_expression' ) {
+                    $case_expression = $normalized['value'];
+                    $field_sql = $this->render_case_expression( $case_expression );
                 } else {
                     $field_sql = $this->quote_identifier( $normalized['value'] );
                 }
@@ -328,8 +336,16 @@ abstract class AbstractQueryRenderer {
         $data  = $intent->get_data();
 
         $set_parts = [];
-        foreach ( array_keys( $data ) as $column ) {
-            $set_parts[] = $this->quote_identifier( $column ) . " = ?";
+        foreach ( $data as $column => $value ) {
+            $quoted_column = $this->quote_identifier( $column );
+
+            if ( $value instanceof CaseExpression ) {
+                // If the payload value is a CaseExpression DTO, render its compiled string.
+                $set_parts[] = sprintf( "%s = %s", $quoted_column, $this->render_case_expression( $value ) );
+            } else {
+                // Standard plain parameter assignment token.
+                $set_parts[] = sprintf( "%s = ?", $quoted_column );
+            }
         }
 
         $sql = sprintf( "UPDATE %s SET %s", $table, implode( ', ', $set_parts ) );
@@ -388,18 +404,65 @@ abstract class AbstractQueryRenderer {
                 $sql = $col['value'];
             }
 
-            else {
-                $sql = $col['value']; // raw fallback
+            elseif ( $col['type'] === 'case_expression' ) {
+                $case_expression = $col['value'];
+                $sql = $this->render_case_expression( $case_expression );
             }
 
-            if (!empty($col['alias'])) {
-                $sql .= ' AS ' . $this->quote_identifier($col['alias']);
+            else {
+                $sql = $col['value']; // raw fallback.
+            }
+
+            if ( ! empty( $col['alias'] ) ) {
+                $sql .= ' AS ' . $this->quote_identifier( $col['alias'] );
             }
 
             $out[] = $sql;
         }
 
-        return implode(', ', $out);
+        return implode( ', ', $out );
+    }
+
+    /**
+     * Compile a CaseExpression DTO into an ANSI-compliant SQL fragment.
+     * 
+     * @param CaseExpression $case
+     * @return string
+     */
+    protected function render_case_expression( CaseExpression $case ) : string {
+        $sql = "CASE";
+
+        foreach ( $case->get_branches() as $branch ) {
+            $conditions_sql = $this->render_where_clauses( $branch['criteria']->get_conditions() );
+            $then_value     = $branch['then_value'];
+
+            // Determine the correct SQL token for the THEN clause
+            if ( is_object( $then_value ) ) {
+                $then_token = $this->format_value( $then_value );
+            } elseif ( is_string( $then_value ) && static::is_sql_expression( $then_value ) ) {
+                $then_token = $then_value; // Render raw SQL function call directly
+            } else {
+                $then_token = '?'; // Standard parameter value
+            }
+
+            $sql .= sprintf( " WHEN %s THEN %s", $conditions_sql, $then_token );
+        }
+
+        $else_value = $case->get_else();
+        if ( null !== $else_value ) {
+            // Determine the correct SQL token for the ELSE clause
+            if ( is_object( $else_value ) ) {
+                $else_token = $this->format_value( $else_value );
+            } elseif ( is_string( $else_value ) && static::is_sql_expression( $else_value ) ) {
+                $else_token = $else_value;
+            } else {
+                $else_token = '?';
+            }
+                
+            $sql .= sprintf( " ELSE %s", $else_token );
+        }
+
+        return $sql . " END";
     }
 
     /*
@@ -426,6 +489,8 @@ abstract class AbstractQueryRenderer {
                 'Null'      => sprintf( "%s IS %sNULL", $this->quote_identifier( $condition['column'] ), $condition['not'] ? 'NOT ' : '' ),
                                 
                 'In'        => $this->render_in_condition( $condition ),
+
+                'InSubquery' => $this->render_in_subquery_condition( $condition ),
 
                 'Group'     => $this->render_group_condition( $condition ),
 
@@ -472,7 +537,23 @@ abstract class AbstractQueryRenderer {
      * @return string
      */
     protected function render_grouping( array $groups ) : string {
-        return empty( $groups ) ? '' : ' GROUP BY ' . implode( ', ', $this->quote_identifiers( $groups ) );
+        if ( empty( $groups ) ) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ( $groups as $group ) {
+            if ( $group['type'] === 'case_expression' ) {
+                // Compile the case expression string directly into the group list
+                // Note: aliases are ignored.
+                $parts[] = $this->render_case_expression( $group['value'] );
+            } else {
+                // Pass standard string columns through your secure identifier quoter
+                $parts[] = $this->quote_identifier( $group['value'] );
+            }
+        }
+
+        return ' GROUP BY ' . implode( ', ', $parts );
     }
 
     /**
@@ -486,18 +567,95 @@ abstract class AbstractQueryRenderer {
         return '(' . $inner . ')';
     }
 
+    /**
+     * Render an ANSI-compliant SQL IN or NOT IN clause token map.
+     * 
+     * @param array $condition Structured condition descriptor array.
+     * @return string Compiled SQL filter snippet.
+     */
     protected function render_in_condition( array $condition ) : string {
-        $placeholders = implode(
-            ', ',
-            array_fill( 0, count( $condition['values'] ), '?' )
-        );
+        $tokens = [];
+        foreach ( $condition['values'] as $value ) {
+            // If the element is a functional expression string, output its text directly
+            if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
+                $tokens[] = $value;
+            } else {
+                // Otherwise, render a standard variable parameter placeholder
+                $tokens[] = '?';
+            }
+        }
 
         return sprintf(
             "%s %sIN (%s)",
             $this->quote_identifier( $condition['column'] ),
             $condition['not'] ? 'NOT ' : '',
-            $placeholders
+            implode( ', ', $tokens )
         );
+    }
+
+    /**
+     * Render an ANSI-compliant IN or NOT IN subquery expression structure.
+     * 
+     * @param array $condition Structured condition descriptor array.
+     * @return string Compiled SQL filter snippet.
+     */
+    protected function render_in_subquery_condition( array $condition ) : string {
+        /** @var \Callismart\DBPrism\Query\QueryIntents\SelectionIntent $subquery */
+        $subquery = $condition['subquery'];
+
+        // Delegate compiling to the inner subquery's standalone build loop
+        $subquery_sql = $subquery->build();
+
+        // Strip trailing semicolon from the subquery string block if present
+        if ( str_ends_with( $subquery_sql, ';' ) ) {
+            $subquery_sql = rtrim( $subquery_sql, ';' );
+        }
+
+        return sprintf(
+            "%s %sIN (%s)",
+            $this->quote_identifier( $condition['column'] ),
+            $condition['not'] ? 'NOT ' : '',
+            $subquery_sql
+        );
+    }
+
+    /**
+     * Render a structural HAVING block by aligning cleanly with native condition rules.
+     * 
+     * @param array $havings Matrix array collected from get_havings()
+     * @return string
+     */
+    protected function render_havings( array $havings ) : string {
+        if ( empty( $havings ) ) {
+            return '';
+        }
+
+        $sql = ' HAVING ';
+        
+        foreach ( $havings as $index => $having ) {
+            // Determine leading logical connector spacing states.
+            $lead_boolean = ( $index === 0 ) ? '' : ' ' . $having['boolean'] . ' ';
+
+            if ( $having['type'] === 'case_expression' ) {
+                // Compile the case block safely: CASE WHEN ... END.
+                $case_str = $this->render_case_expression( $having['case_expression'] );
+                
+                $sql .= sprintf( "%s%s %s ?", $lead_boolean, $case_str, $having['operator'] );
+            } else {
+                // If it is a basic aggregate condition, pass it straight to your 
+                // native renderer pipeline as an array of 1 element!
+                $native_condition_str = $this->render_where_clauses( [ $having ] );
+                
+                // Strip out any redundant logical prefixes if this is the first item
+                if ( $index === 0 ) {
+                    $native_condition_str = preg_replace( '/^(AND|OR)\s+/i', '', trim($native_condition_str) );
+                }
+
+                $sql .= $lead_boolean . $native_condition_str;
+            }
+        }
+
+        return $sql;
     }
 
     /*
@@ -540,11 +698,21 @@ abstract class AbstractQueryRenderer {
      * @return string
      */
     protected function render_ordering( array $orders ) : string {
-        if ( empty( $orders ) ) return '';
+        if ( empty( $orders ) ) {
+            return '';
+        }
+        
         $parts = [];
         foreach ( $orders as $order ) {
-            $parts[] = $this->quote_identifier( $order['column'] ) . ' ' . $order['direction'];
+            
+            $sort_target = ( isset( $order['type'] ) && $order['type'] === 'case_expression' )
+                ? $this->render_case_expression( $order['column'] )
+                : $this->quote_identifier( $order['column'] );
+
+            // Append the direction identifier (ASC / DESC) right on the trailing edge
+            $parts[] = $sort_target . ' ' . $order['direction'];
         }
+        
         return ' ORDER BY ' . implode( ', ', $parts );
     }
 
@@ -563,40 +731,43 @@ abstract class AbstractQueryRenderer {
 
     /**
      * Quote a database identifier, handling dot notation and aliases.
+     * 
      * @param string $identifier
      * @return string
      */
     public function quote_identifier( string $identifier ) : string {
+
+        if ( $identifier instanceof DefaultColumnValue ) {
+            return $identifier;
+        }
+
         $identifier = trim( $identifier );
         
-        // 1. If it's a global wildcard, do not quote it.
         if ( $identifier === '*' ) {
             return '*';
         }
 
-        // 2. Explicitly guard table wildcards like "m.*"
+        if ( static::is_sql_expression( $identifier ) ) {
+            return $identifier;
+        }
+
         if ( str_ends_with( $identifier, '.*' ) ) {
             $prefix = substr( $identifier, 0, -2 );
             return $this->quote_identifier( $prefix ) . '.*';
         }
 
-        // 3. Handle explicit aliases (e.g., "table_name AS alias" or "table_name alias")
-        // Handles multiple spaces seamlessly by filtering empty parts
         if ( str_contains( $identifier, ' ' ) ) {
             $parts = array_values( array_filter( explode( ' ', $identifier ) ) );
             
-            // If it's explicitly "table AS alias"
             if ( isset( $parts[1] ) && strtolower( $parts[1] ) === 'as' ) {
                 return $this->quote_identifier( $parts[0] ) . ' AS ' . $this->quote_identifier( $parts[2] );
             }
             
-            // Otherwise, it's an implicit space alias "table alias"
             if ( count( $parts ) === 2 ) {
                 return $this->quote_identifier( $parts[0] ) . ' ' . $this->quote_identifier( $parts[1] );
             }
         }
 
-        // 4. Handle nested dot notation namespaces (e.g., "database.table")
         if ( str_contains( $identifier, '.' ) ) {
             $parts = array_map( [ $this, 'quote_identifier' ], explode( '.', $identifier ) );
             return implode( '.', $parts );
@@ -643,10 +814,11 @@ abstract class AbstractQueryRenderer {
         }
         
         return match( true ) {
-            is_bool( $value )       => $this->supports_native_booleans() ? ( $value ? 'TRUE' : 'FALSE' ) : ( $value ? '1' : '0' ),
-            is_null( $value )       => 'NULL',
-            is_numeric( $value )    => (string) $value,
-            default                 => "'" . str_replace( "'", "''", (string) $value ) . "'"
+            static::is_sql_expression( $value ) => (string) $value,
+            is_bool( $value )                   => $this->supports_native_booleans() ? ( $value ? 'TRUE' : 'FALSE' ) : ( $value ? '1' : '0' ),
+            is_null( $value )                   => 'NULL',
+            is_numeric( $value )                => (string) $value,
+            default                             => "'" . str_replace( "'", "''", (string) $value ) . "'"
         };
     }
 }

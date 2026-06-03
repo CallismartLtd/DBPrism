@@ -17,6 +17,7 @@ use LogicException;
  * Provides fluent methods for building query conditions and managing bindings.
  */
 trait QueryCriteriaTrait {
+    use ColumnNormalizerTrait;
     /**
      * @var array $conditions Array of structured condition groups.
      */
@@ -45,7 +46,9 @@ trait QueryCriteriaTrait {
             'boolean'  => $boolean
         ];
 
-        $this->bindings[] = $value;
+        if ( $this->should_bind_value( $value ) ) {
+            $this->bindings[] = $value;
+        }
 
         return $this;
     }
@@ -159,7 +162,9 @@ trait QueryCriteriaTrait {
         ];
 
         foreach ( $values as $value ) {
-            $this->bindings[] = $value;
+            if ( $this->should_bind_value( $value ) ) {
+                $this->bindings[] = $value;
+            }
         }
 
         return $this;
@@ -174,6 +179,69 @@ trait QueryCriteriaTrait {
      */
     public function where_not_in( string $column, array $values ) : static {
         return $this->where_in( $column, $values, 'AND', true );
+    }
+
+    /**
+     * Add a WHERE IN subquery clause using a nested selection intent builder callback.
+     * 
+     * @param string   $column   The target column for comparison.
+     * @param callable $callback Receives a new query builder instance to construct the subquery.
+     * @param string   $boolean  Logical connector (AND / OR).
+     * @param bool     $not      Whether to negate the condition (NOT IN).
+     * @return static
+     */
+    public function where_in_subquery( string $column, callable $callback, string $boolean = 'AND', bool $not = false ) : static {
+        $subquery = $this->get_selection_intent();
+        
+        $callback( $subquery );
+
+        $this->conditions[] = [
+            'type'     => 'InSubquery',
+            'column'   => $column,
+            'subquery' => $subquery,
+            'boolean'  => $boolean,
+            'not'      => $not,
+        ];
+
+        // Safely extract and bubble up inner parameter values
+        foreach ( $subquery->get_bindings() as $binding ) {
+            $this->bindings[] = $binding;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add a WHERE NOT IN subquery clause.
+     * 
+     * @param string   $column   The target column.
+     * @param callable $callback Receives a new query builder instance.
+     * @return static
+     */
+    public function where_not_in_subquery( string $column, callable $callback ) : static {
+        return $this->where_in_subquery( $column, $callback, 'AND', true );
+    }
+
+    /**
+     * Add an OR WHERE IN subquery clause.
+     * 
+     * @param string   $column   The target column.
+     * @param callable $callback Receives a new query builder instance.
+     * @return static
+     */
+    public function or_where_in_subquery( string $column, callable $callback ) : static {
+        return $this->where_in_subquery( $column, $callback, 'OR' );
+    }
+
+    /**
+     * Add an OR WHERE NOT IN subquery clause.
+     * 
+     * @param string   $column   The target column.
+     * @param callable $callback Receives a new query builder instance.
+     * @return static
+     */
+    public function or_where_not_in_subquery( string $column, callable $callback ) : static {
+        return $this->where_in_subquery( $column, $callback, 'OR', true );
     }
 
     /**
@@ -195,8 +263,13 @@ trait QueryCriteriaTrait {
             'not'     => $not,
         ];
 
-        $this->bindings[] = $from;
-        $this->bindings[] = $to;
+        if ( $this->should_bind_value( $from ) ) {
+            $this->bindings[] = $from;
+        }
+
+        if ( $this->should_bind_value( $to ) ) {
+            $this->bindings[] = $to;
+        }
 
         return $this;
     }
@@ -229,7 +302,9 @@ trait QueryCriteriaTrait {
         ];
 
         foreach ( $bindings as $binding ) {
-            $this->bindings[] = $binding;
+            if ( $this->should_bind_value( $binding ) ) {
+                $this->bindings[] = $binding;
+            }
         }
 
         return $this;
@@ -255,7 +330,9 @@ trait QueryCriteriaTrait {
 
         // Merge bindings in order.
         foreach ( $group->get_bindings() as $binding ) {
-            $this->bindings[] = $binding;
+            if ( $this->should_bind_value( $binding ) ) {
+                $this->bindings[] = $binding;
+            }
         }
 
         return $this;
@@ -292,6 +369,7 @@ trait QueryCriteriaTrait {
 
         foreach ( $subquery->get_bindings() as $binding ) {
             $this->bindings[] = $binding;
+            
         }
 
         return $this;
@@ -327,6 +405,10 @@ trait QueryCriteriaTrait {
      * @return static
      */
     public function where_like( string $column, string $value, string $boolean = 'AND', bool $not = false, bool $is_pre_escaped = false ) : static {
+        if ( ! $this->should_bind_value( $value ) ) {
+            throw new \InvalidArgumentException( 'LIKE value must be a scalar parameter.' );
+        }
+        
         $this->conditions[] = [
             'type'    => 'Like',
             'column'  => $column,
@@ -602,5 +684,20 @@ trait QueryCriteriaTrait {
 
         return $selection_intent;
 
+    }
+
+    /**
+     * Determine if a value should be added to the parameter bindings array.
+     * 
+     * @param mixed $value
+     * @return bool
+     */
+    protected function should_bind_value( mixed $value ) : bool {
+        // If it's a string expression or function call, bypass parameterization
+        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
+            return false;
+        }
+        
+        return true;
     }
 }

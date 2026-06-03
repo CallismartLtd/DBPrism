@@ -15,6 +15,7 @@ use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
 use InvalidArgumentException;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
+use Callismart\DBPrism\Utils\CaseExpression;
 
 /**
  * Represents an intent to persist or modify data (INSERT/UPDATE).
@@ -68,10 +69,21 @@ class PersistenceIntent implements QueryIntentInterface {
      * 
      * @param array $data Column => Value pairs.
      * @return static
+     * @throws \InvalidArgumentException If a CaseExpression is supplied on 
+     * an operation that isn't an UPDATE.
      */
     public function values( array $data ) : static {
+        foreach ( $data as $value ) {
+            if ( $value instanceof CaseExpression ) {
+                throw new \InvalidArgumentException(
+                    "Symmetry Violation: CaseExpression cannot be passed directly into raw value sets. " .
+                    "Use the dedicated 'set_case()' method to apply dynamic updates."
+                );
+            }
+        }
+
         $this->is_multi = false;
-        $this->data     = $data;
+        $this->data = array_merge( $this->data, $data );
 
         return $this;
     }
@@ -88,8 +100,46 @@ class PersistenceIntent implements QueryIntentInterface {
             throw new InvalidArgumentException( 'Multi-values intent requires at least one row.' );
         }
 
+        // Must be an array of associative arrays.
+        foreach ( $rows as $row ) {
+            if ( ! is_array( $row ) || array_values( $row ) === $row ) {
+                throw new InvalidArgumentException( 'Each row in multi-values intent must be an associative array of column => value pairs.' );
+            }
+
+            foreach ( $row as $value ) {
+                if ( $value instanceof CaseExpression ) {
+                    throw new InvalidArgumentException(
+                        "Symmetry Violation: CaseExpression cannot be passed directly into raw value sets. " .
+                        "Use the dedicated 'set_case()' method to apply dynamic updates."
+                    );
+                }
+            }
+        }
+
         $this->is_multi = true;
-        $this->data     = $rows;
+        $this->data     = array_merge( $this->data, $rows );
+
+        return $this;
+    }
+
+    /**
+     * Update an individual database column using a custom dynamic ANSI CASE evaluation block.
+     * 
+     * Note: This method is only applicable to UPDATE statements.
+     * Attempting to use it in an INSERT context will throw an exception during rendering, 
+     * as CASE expressions are not valid in value sets for new records.
+     * 
+     * @param string   $column   The target database column to be updated.
+     * @param callable $callback Closure receiving a clean CaseExpression DTO to formulate branches.
+     * @return static Fluent builder instance.
+     */
+    public function set_case( string $column, callable $callback ) : static {
+        $case_expression = new \Callismart\DBPrism\Utils\CaseExpression();
+        $callback( $case_expression );
+
+        // Because values() throws on CaseExpression, appending it directly allows 
+        // update statements to capture it seamlessly while keeping insert blocks clean.
+        $this->data[ trim( $column ) ] = $case_expression;
 
         return $this;
     }
@@ -129,15 +179,60 @@ class PersistenceIntent implements QueryIntentInterface {
      * @return array
      */
     public function get_bindings() : array {
-        // 1. Get the values being SET (inherited from your previous logic)
-        $set_bindings = $this->is_multi ? $this->flatten_multi_data() : array_values( $this->data );
+        $set_bindings = [];
 
-        // 2. Get the WHERE criteria bindings from the trait
-        // Note: We use the trait's property directly because the 
-        // trait's get_bindings() would likely be shadowed.
+        if ( $this->is_multi ) {
+            // Bulk INSERT contexts
+            foreach ( $this->data as $row ) {
+                foreach ( $row as $val ) {
+                    $set_bindings = array_merge( $set_bindings, $this->extract_value_bindings( $val ) );
+                }
+            }
+        } else {
+            // Single row INSERT or UPDATE context
+            foreach ( $this->data as $val ) {
+                $set_bindings = array_merge( $set_bindings, $this->extract_value_bindings( $val ) );
+            }
+        }
+
+        // Get the WHERE criteria bindings from the trait
         $where_bindings = $this->bindings; 
 
         return array_merge( $set_bindings, $where_bindings );
+    }
+
+    /**
+     * Safely unpack value tokens or cascading expression criteria bindings.
+     * 
+     * @param mixed $value
+     * @return array
+     */
+    private function extract_value_bindings( mixed $value ) : array {
+        if ( $value instanceof CaseExpression ) {
+            $extracted = [];
+            foreach ( $value->get_branches() as $branch ) {
+                // A. Pull bindings generated inside the WHEN condition branch sandbox
+                foreach ( $branch['criteria']->get_bindings() as $condition_binding ) {
+                    $extracted[] = $condition_binding;
+                }
+
+                // B. Pull the output THEN value if it is an executable parameter
+                if ( ! is_object( $branch['then_value'] ) ) {
+                    $extracted[] = $branch['then_value'];
+                }
+            }
+
+            // C. Pull the final fallback ELSE binding if present
+            $else_value = $value->get_else();
+            if ( null !== $else_value && ! is_object( $else_value ) ) {
+                $extracted[] = $else_value;
+            }
+
+            return $extracted;
+        }
+
+        // Standard plain text parameters or objects (like raw expression tokens)
+        return is_object( $value ) ? [] : [ $value ];
     }
 
     private function flatten_multi_data() : array {

@@ -245,7 +245,7 @@ class MySQLRenderer extends AbstractQueryRenderer {
      * {@inheritdoc}
      */
     protected function render_lock_mode( LockMode $mode ) : string {
-        return match($mode) {
+        return match( $mode ) {
             LockMode::SHARED      => ' FOR SHARE',
             LockMode::EXCLUSIVE   => ' FOR UPDATE',
             LockMode::NO_WAIT     => ' FOR UPDATE NOWAIT',

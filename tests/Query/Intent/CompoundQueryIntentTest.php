@@ -124,11 +124,22 @@ final class CompoundQueryIntentTest extends TestCase {
         $compound = $q1->union_all( $q2 );
         
         // Apply sorting directly to the compound instance wrapper
-        $compound->order_by( 'name', 'ASC' )->order_by( 'status', 'DESC' );
+        $compound->order_by( 'name', 'ASC' )
+        ->order_by( 'status', 'DESC' );
 
         $expected_orders = [
-            [ 'column' => 'name', 'direction' => 'ASC' ],
-            [ 'column' => 'status', 'direction' => 'DESC' ]
+            [ 
+                'type'      => 'string',
+                'column'    => 'name', 
+                'direction' => 'ASC' ,
+                
+            ],
+            [
+                'type'      => 'string',
+                'column'    => 'status', 
+                'direction' => 'DESC',
+                
+            ]
         ];
 
         $this->assertSame( $expected_orders, $compound->get_orders() );

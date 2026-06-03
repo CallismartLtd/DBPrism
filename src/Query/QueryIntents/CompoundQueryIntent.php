@@ -151,7 +151,7 @@ class CompoundQueryIntent implements QueryIntentInterface {
     /**
      * Retrieve the array of pre-normalized outer column selection maps.
      * 
-     * @return array<int, array{type: string, value: string, alias?: string}>
+     * @return array<int, array{type: string, value: mixed, alias?: string}>
      */
     public function get_outer_selections() : array {
         return $this->outer_selections;
