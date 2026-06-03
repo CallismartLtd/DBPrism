@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CallismartDBPrism\Tests\Query\Intent;
 
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
+use Callismart\DBPrism\Query\SQLBuilder;
 use PHPUnit\Framework\TestCase;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
 
@@ -15,6 +16,11 @@ use function Callismart\DBPrism\tests\queryBuilder;
  */
 class QueryCriteriaStub {
     use QueryCriteriaTrait;
+    protected SQLBuilder $builder;
+
+    public function __construct() {
+        $this->builder  = queryBuilder();
+    }
 }
 
 /**
@@ -149,11 +155,11 @@ class QueryCriteriaTest extends TestCase {
      */
     public function test_nested_where_groups() : void {
         $this->criteria->where( 'global', '=', 'yes' )
-                       ->where_group( function( QueryCriteriaStub $query ) {
+                       ->where_group( function( SelectionIntent $query ) {
                            $query->where( 'nested_one', '=', 'a' )
                                  ->or_where( 'nested_two', '=', 'b' );
                        } )
-                       ->or_where_group( function( QueryCriteriaStub $query ) {
+                       ->or_where_group( function( SelectionIntent $query ) {
                            $query->where( 'alternative', '=', 'c' );
                        } );
 

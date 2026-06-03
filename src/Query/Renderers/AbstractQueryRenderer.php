@@ -563,7 +563,7 @@ abstract class AbstractQueryRenderer {
 
     /**
      * Quote a database identifier, handling dot notation and aliases.
-     * * @param string $identifier
+     * @param string $identifier
      * @return string
      */
     public function quote_identifier( string $identifier ) : string {

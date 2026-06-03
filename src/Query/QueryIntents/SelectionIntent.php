@@ -19,6 +19,7 @@ use Callismart\DBPrism\Query\Traits\SupportsGroupingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsJoinsTrait;
 use Callismart\DBPrism\Query\Traits\SupportsOrderingTrait;
 use Callismart\DBPrism\Query\Traits\SupportsSlicingTrait;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
 use Callismart\DBPrism\Utils\LockMode;
 
 /**
@@ -79,6 +80,23 @@ class SelectionIntent implements QueryIntentInterface{
             $this->columns[] = $this->normalize_column( $column );
         }
         
+        return $this;
+    }
+
+    /**
+     * Select raw expressions without normalization.
+     * 
+     * @param string ...$expressions Variadic list of raw expressions.
+     * @return static
+     */
+    public function select_raw( string ...$expressions ) : static {
+        foreach ( $expressions as $expr ) {
+            $this->columns[] = [
+                'type'  => 'expression',
+                'value' => DefaultColumnValue::expression( $expr )
+            ];
+        }
+
         return $this;
     }
 

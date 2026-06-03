@@ -11,7 +11,8 @@ namespace Callismart\DBPrism\Query\Traits;
 
 /**
  * Trait ColumnNormalizerTrait
- * * This trait defines the canonical parsing and normalization blueprint for all columns,
+ * 
+ * This trait defines the canonical parsing and normalization blueprint for all columns,
  * expressions, and literals supplied during fluent query building across the framework.
  * It ensures cross-engine compliance (MySQL, PostgreSQL, SQLite) by isolating field aliases
  * and automatically transforming double-quoted string literals into ANSI-compliant single quotes.

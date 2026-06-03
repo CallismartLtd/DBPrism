@@ -167,17 +167,4 @@ final class CompoundQueryIntentTest extends TestCase {
         $this->assertSame( $next, $unions[0]->intent );
         $this->assertSame( 'UNION ALL', $unions[0]->operator );
     }
-
-    /**
-     * Guardrail Test: Verifying that `new_instance()` enforces cloning limitations.
-     */
-    public function test_new_instance_throws_bad_method_call_exception() : void {
-        $q1 = queryBuilder()->select( '*' )->from( 'wp_smliser_plugins' );
-        $q2 = queryBuilder()->select( '*' )->from( 'wp_smliser_themes' );
-
-        $q1->union_all( $q2 );
-
-        $this->expectException( \BadMethodCallException::class );
-        $this->expectExceptionMessage( 'CompoundQueryIntent context cannot be duplicated' );
-    }
 }

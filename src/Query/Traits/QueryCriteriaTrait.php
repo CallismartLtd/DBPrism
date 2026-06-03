@@ -253,7 +253,7 @@ trait QueryCriteriaTrait {
             'boolean'    => $boolean,
         ];
 
-        // Merge bindings in order
+        // Merge bindings in order.
         foreach ( $group->get_bindings() as $binding ) {
             $this->bindings[] = $binding;
         }
@@ -319,7 +319,7 @@ trait QueryCriteriaTrait {
 
     /**
      * Add a basic WHERE LIKE clause with automatic value escaping.
-     * * @param string $column   The target column.
+     * @param string $column   The target column.
      * @param string $value    The search pattern (e.g., '%term%').
      * @param string $boolean  Logical connector (AND / OR).
      * @param bool   $not      Whether to negate (NOT LIKE).
@@ -520,7 +520,7 @@ trait QueryCriteriaTrait {
     /**
      * Escapes the internal search term to prevent user-injected wildcards.
      * Standardizes on '=' as the framework escape character.
-     * * @param string $term
+     * @param string $term
      * @return string
      */
     public function escape_like_term( string $term ) : string {
@@ -532,7 +532,7 @@ trait QueryCriteriaTrait {
      * * This ensures that edge wildcards ('%' or '_') are preserved as functional SQL rules,
      * while any internal wildcards or escape characters within the actual search phrase 
      * are cleanly isolated.
-     * * @param string $value The raw pattern string (e.g., '%10% off%').
+     * @param string $value The raw pattern string (e.g., '%10% off%').
      * @return string The cross-engine sanitized pattern string.
      */
     public function escape_like_value( string $value ) : string {
