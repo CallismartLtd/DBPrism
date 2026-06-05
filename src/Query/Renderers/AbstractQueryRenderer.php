@@ -732,22 +732,18 @@ abstract class AbstractQueryRenderer {
     /**
      * Quote a database identifier, handling dot notation and aliases.
      * 
-     * @param string $identifier
+     * @param string|DefaultColumnValue $identifier
      * @return string
      */
-    public function quote_identifier( string $identifier ) : string {
+    public function quote_identifier( string|DefaultColumnValue $identifier ) : string {
 
         if ( $identifier instanceof DefaultColumnValue ) {
             return $identifier;
         }
 
         $identifier = trim( $identifier );
-        
-        if ( $identifier === '*' ) {
-            return '*';
-        }
 
-        if ( static::is_sql_expression( $identifier ) ) {
+        if ( static::is_sql_expression( $identifier ) || static::is_sql_literal( $identifier ) ) {
             return $identifier;
         }
 

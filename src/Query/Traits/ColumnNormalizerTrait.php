@@ -93,6 +93,41 @@ trait ColumnNormalizerTrait {
     }
 
     /**
+     * Determine whether a value is a raw SQL literal or protected expression segment.
+     * 
+     * @param string $value
+     * @return bool
+     */
+    protected static function is_sql_literal( string $value ) : bool {
+        $value = trim( $value );
+        $upper = \strtoupper( $value );
+
+        // Instantly catch standalone reserved markers.
+        $reserved = [ 'NULL', 'TRUE', 'FALSE', '*' ];
+        if ( in_array( $upper, $reserved, true ) ) {
+            return true;
+        }
+
+        // Structural Interception: Catch Aliases (e.g., "NULL AS email", "1 AS flag")
+        // If the base fragment before the "AS" keyword is a 
+        // literal, the whole string is a literal block.
+        if ( \stripos( $value, ' AS ' ) !== false ) {
+            $segments = \preg_split( '/\s+AS\s+/i', $value );
+            $base_fragment = \trim( $segments[0] );
+            
+            return self::is_sql_literal( $base_fragment );
+        }
+
+        // 3. Catch structural clauses like "DISTINCT *"
+        if ( \strpos( $upper, 'DISTINCT ' ) === 0 ) {
+            $after_distinct = \trim( \substr( $value, 8 ) );
+            return self::is_sql_literal( $after_distinct );
+        }
+
+        return false;
+    }
+
+    /**
      * Determine whether a value is wrapped in single quotes (ANSI string literal).
      *
      * @param  string $value

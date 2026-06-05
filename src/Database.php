@@ -36,7 +36,7 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * @method int|null get_insert_id() Get the last insertion ID.
  *
  * @method bool exec(string $query) Execute a raw SQL query without prepared statements.
- * @method bool execute( string $query, array $params = [] ) Execute a parameterized query and return the number of affected rows.
+ * @method int execute( string $query, array $params = [] ) Execute a parameterized query and return the number of affected rows.
  *
  * @method string get_server_version() Get the database server version.
  * @method string get_driver() Get the engine type (mysql, sqlite, etc).
