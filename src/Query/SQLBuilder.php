@@ -105,6 +105,34 @@ class SQLBuilder {
     }
 
     /**
+     * Start a raw SELECT query.
+     *
+     * @param string ...$expressions
+     * @return SelectionIntent
+     */
+    public function select_raw( string ...$expressions ) : SelectionIntent {
+        $this->reset_intent();
+        $this->type             = 'SELECT';
+        $this->active_intent    = SelectionIntent::make( $this )->select_raw( ...$expressions );
+        
+        return $this->active_intent;
+    }
+
+    /**
+     * Start a case SELECT query.
+     *
+     * @param callable ...$callables
+     * @return SelectionIntent
+     */
+    public function select_case( callable ...$callables ) : SelectionIntent {
+        $this->reset_intent();
+        $this->type             = 'SELECT';
+        $this->active_intent    = SelectionIntent::make( $this )->select_case( ...$callables );
+        
+        return $this->active_intent;
+    }
+
+    /**
      * Start an INSERT query.
      *
      * @param string $table Table name (raw, unquoted)
