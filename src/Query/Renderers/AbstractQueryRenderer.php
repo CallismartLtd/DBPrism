@@ -138,11 +138,13 @@ abstract class AbstractQueryRenderer {
             $sql .= "DISTINCT ";
         }
 
-        $sql .= sprintf(
-            "%s FROM %s",
-            $this->render_columns( $intent->get_columns() ),
-            $this->quote_identifier( $intent->get_table_name() )
-        );
+        $sql .= $this->render_columns( $intent->get_columns() );
+
+        $table  = $intent->get_table_name();
+
+        if ( ! empty( $table ) ) {
+            $sql .= " FROM " . $this->quote_identifier( $table );
+        }
 
         $sql .= $this->render_joins( $intent->get_joins() );
 
@@ -401,7 +403,7 @@ abstract class AbstractQueryRenderer {
             }
 
             elseif ( $col['type'] === 'expression' ) {
-                $sql = $col['value'];
+                $sql = $this->parse_agnostic_expression( $col['value'] );
             }
 
             elseif ( $col['type'] === 'case_expression' ) {
@@ -519,7 +521,7 @@ abstract class AbstractQueryRenderer {
                     $this->quote_identifier( $condition['second_column'] )
                 ),
 
-                'Raw' => $condition['expression'],
+                'Raw' => $this->parse_agnostic_expression( $condition['expression'] ),
 
                 default => throw new \InvalidArgumentException( "Unsupported condition type: \"{$condition['type']}\"" )
             };
@@ -738,10 +740,18 @@ abstract class AbstractQueryRenderer {
     public function quote_identifier( string|DefaultColumnValue $identifier ) : string {
 
         if ( $identifier instanceof DefaultColumnValue ) {
+            if ( $identifier->is_expression() ) {
+                return $this->parse_agnostic_expression( (string) $identifier );
+            }
+
             return $identifier;
         }
 
         $identifier = trim( $identifier );
+
+        if ( str_contains( $identifier, '[' ) && str_contains( $identifier, ']' ) ) {
+            return $this->parse_agnostic_expression( $identifier );
+        }
 
         if ( static::is_sql_expression( $identifier ) || static::is_sql_literal( $identifier ) ) {
             return $identifier;
@@ -816,5 +826,19 @@ abstract class AbstractQueryRenderer {
             is_numeric( $value )                => (string) $value,
             default                             => "'" . str_replace( "'", "''", (string) $value ) . "'"
         };
+    }
+
+    /**
+     * Parse an agnostic raw expression string and replace bracket delimiters 
+     * with the active engine's native identifier quotes.
+     * 
+     * @param string $expression Raw SQL snippet containing `[table]` or `[column]` tokens.
+     * @return string
+     */
+    public function parse_agnostic_expression( string $expression ) : string {
+        return preg_replace_callback('/\[([^\]]+)\]/', function ( array $matches ) {
+            // $matches[1] isolates the identifier element wrapped inside the brackets
+            return $this->quote_identifier( $matches[1] );
+        }, $expression);
     }
 }
