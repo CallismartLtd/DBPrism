@@ -54,6 +54,11 @@ class SelectionIntent implements QueryIntentInterface{
     protected bool $distinct = false;
 
     /**
+     * @var array $select_bindings Parameters originating from column selections or subqueries.
+     */
+    protected array $select_bindings = [];
+
+    /**
      * Query lock mode.
      * 
      * @var LockMode
@@ -170,7 +175,7 @@ class SelectionIntent implements QueryIntentInterface{
         ];
 
         foreach ( $subquery_intent->get_bindings() as $sub_binding ) {
-            $this->bindings[] = $sub_binding;
+            $this->select_bindings[] = $sub_binding;
         }
 
         return $this;
@@ -267,7 +272,14 @@ class SelectionIntent implements QueryIntentInterface{
      * @return array
      */
     public function get_bindings() : array {
+
+        if ( null !== $this->custom_bindings ) {
+            return $this->custom_bindings;
+        }
+        
         return \array_merge(
+            $this->select_bindings,
+            $this->joins_bindings,
             $this->bindings,
             $this->groups_bindings,
             $this->having_bindings,

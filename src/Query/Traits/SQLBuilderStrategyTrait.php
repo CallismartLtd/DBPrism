@@ -16,6 +16,21 @@ trait SQLBuilderStrategyTrait {
      * @var SQLBuilder $builder
      */
     protected SQLBuilder $builder;
+
+    /**
+     * @var array|null $custom_bindings Explicit user-defined parameter override.
+     */
+    protected ?array $custom_bindings = null;
+
+    /**
+     * Manually override the internal calculated bindings for this intent.
+     * * @param array $bindings An explicit sequence of parameters to use.
+     * @return static
+     */
+    public function set_bindings( array $bindings ) : static {
+        $this->custom_bindings = $bindings;
+        return $this;
+    }
     
     /**
      * Build query.

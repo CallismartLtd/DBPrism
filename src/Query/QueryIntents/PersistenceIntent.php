@@ -182,6 +182,10 @@ class PersistenceIntent implements QueryIntentInterface {
      * @return array
      */
     public function get_bindings() : array {
+        if ( null !== $this->custom_bindings ) {
+            return $this->custom_bindings;
+        }
+        
         $set_bindings = [];
 
         if ( $this->is_multi ) {

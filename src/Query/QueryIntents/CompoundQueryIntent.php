@@ -172,6 +172,10 @@ class CompoundQueryIntent implements QueryIntentInterface {
      * @return array Sequential positional parameter parameter values.
      */
     public function get_bindings() : array {
+        if ( null !== $this->custom_bindings ) {
+            return $this->custom_bindings;
+        }
+        
         $bindings = $this->primary_intent->get_bindings();
         
         foreach ( $this->unions as $union ) {

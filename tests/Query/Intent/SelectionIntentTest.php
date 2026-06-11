@@ -385,4 +385,147 @@ final class SelectionIntentTest extends TestCase {
             $query->get_bindings()
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Advanced Specialized Join & Binding Sequence Tests
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Test basic specialized join criteria parameter isolation.
+     */
+    public function test_advanced_join_isolates_and_tracks_bindings() : void {
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'owners ro' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_value( 'ro.type', '=', 'individual' )
+                     ->on_column( 'ro.subject_id', '=', 'u.id' );
+            });
+
+        // Verifies the trait isolates the join binding correctly
+        $this->assertSame( [ 'individual' ], $query->get_bindings() );
+    }
+
+    /**
+     * Critical Test: Verifies that join parameters are ordered BEFORE global 
+     * WHERE conditions, regardless of the chronological application chaining sequence.
+     */
+    public function test_join_bindings_always_precede_where_bindings_in_final_array() : void {
+        // Appending standard WHERE filter *before* attaching the left join block
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'owners ro' )
+            ->where( 'ro.status', '=', 'active' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_value( 'ro.type', '=', 'individual' )
+                     ->on_column( 'ro.subject_id', '=', 'u.id' );
+            });
+
+        // Even though 'active' was specified first in code, 'individual' must 
+        // appear first in get_bindings() because JOIN statements are rendered 
+        // before WHERE clauses in the SQL string.
+        $this->assertSame(
+            [ 'individual', 'active' ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Test multi-table join connections running stacked parameter values.
+     */
+    public function test_multiple_advanced_joins_stack_bindings_chronologically() : void {
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'owners ro' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_value( 'ro.type', '=', 'individual' )
+                     ->on_column( 'ro.subject_id', '=', 'u.id' );
+            })
+            ->left_join( 'organizations o', function ( $join ) {
+                $join->on_value( 'ro.type', '=', 'corporate' )
+                     ->on_column( 'ro.subject_id', '=', 'o.id' );
+            })
+            ->where( 'ro.is_deleted', '=', 0 );
+
+        $this->assertSame(
+            [ 'individual', 'corporate', 0 ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Test join-specific NULL and NOT NULL assertions bypass variable parameterization.
+     */
+    public function test_advanced_join_null_assertions_bypass_bindings() : void {
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'owners ro' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_column( 'ro.subject_id', '=', 'u.id' )
+                     ->on_null( 'u.deleted_at' )
+                     ->on_not_null( 'u.activated_at' );
+            });
+
+        $this->assertSame( [], $query->get_bindings() );
+    }
+
+    /**
+     * Test deep structural brace logical grouping loops inside an ON block.
+     */
+    public function test_advanced_join_supports_nested_on_groups_and_bindings() : void {
+        $query = queryBuilder()
+            ->select( '*' )
+            ->from( 'owners ro' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_column( 'ro.subject_id', '=', 'u.id' )
+                     ->on_group( function ( $sub_join ) {
+                         $sub_join->on_value( 'u.role', '=', 'manager' )
+                                  ->or_on_group( function ( $deep_join ) {
+                                      $deep_join->on_value( 'u.clearance', '=', 'high' );
+                                  });
+                     });
+            })
+            ->where( 'ro.visibility', '=', 'public' );
+
+        $this->assertSame(
+            [ 'manager', 'high', 'public' ],
+            $query->get_bindings()
+        );
+    }
+
+    /**
+     * Stress: Complete subquery selection query with mixed select definitions, 
+     * advanced join parameter boundaries, and complex global filtering conditions.
+     */
+    public function test_complex_subquery_composite_tree_resolves_bindings_with_absolute_precision() : void {
+        $query = queryBuilder()
+            ->select( 'ro.id' )
+            ->select_subquery( function( $sub ) {
+                $sub->select( 'COUNT(*)' )
+                    ->from( 'logs l' )
+                    ->where( 'l.severity', '=', 'critical' );
+            }, 'log_count' )
+            ->from( 'owners ro' )
+            ->left_join( 'users u', function ( $join ) {
+                $join->on_value( 'ro.category', '=', 'premium' )
+                     ->on_column( 'ro.subject_id', '=', 'u.id' );
+            })
+            ->where( 'ro.status', '=', 'active' )
+            ->where_group( function ( $group ) {
+                $group->where( 'u.verified', '=', 1 )
+                      ->or_where_null( 'u.id' );
+            });
+
+        // Exact Left-to-Right layout compilation order resolution sequence:
+        // 1. Columns/Subquery parameters: 'critical'
+        // 2. Joins block parameters:      'premium'
+        // 3. Global WHERE parameters:     'active'
+        // 4. Nested Group parameters:     1
+        $this->assertSame(
+            [ 'critical', 'premium', 'active', 1 ],
+            $query->get_bindings()
+        );
+    }
 }

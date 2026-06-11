@@ -677,20 +677,75 @@ abstract class AbstractQueryRenderer {
         
         $sql = [];
         foreach ( $joins as $join ) {
-            if ( $join['type'] === 'CROSS' ) {
-                $sql[] = sprintf( "CROSS JOIN %s", $this->quote_identifier( $join['table'] ) );
+            $table_quoted = $this->quote_identifier( $join['table'] );
+
+            // Intercept advanced items and route them to our specialized rendering method
+            if ( ! empty( $join['is_advanced'] ) ) {
+                $on_clause_sql = $this->render_join_conditions( $join['conditions'] );
+                $sql[] = sprintf( "%s JOIN %s ON %s", $join['type'], $table_quoted, $on_clause_sql );
                 continue;
             }
+
+            if ( $join['type'] === 'CROSS' ) {
+                $sql[] = sprintf( "CROSS JOIN %s", $table_quoted );
+                continue;
+            }
+            
             $sql[] = sprintf( 
                 "%s JOIN %s ON %s %s %s", 
                 $join['type'], 
-                $this->quote_identifier( $join['table'] ), 
+                $table_quoted, 
                 $this->quote_identifier( $join['first'] ), 
                 $join['operator'], 
                 $this->quote_identifier( $join['second'] ) 
             );
         }
         return ' ' . implode( ' ', $sql );
+    }
+
+    protected function render_join_conditions( array $conditions ) : string {
+    $parts = [];
+        foreach ( $conditions as $index => $condition ) {
+            $connector = ( $index === 0 ) ? '' : " {$condition['boolean']} ";
+
+            $clause = match ( $condition['type'] ) {
+                // Column-to-Column Comparison (Both sides securely identifier-quoted)
+                'OnColumn' => sprintf(
+                    "%s %s %s",
+                    $this->quote_identifier( $condition['first_column'] ),
+                    $condition['operator'],
+                    $this->quote_identifier( $condition['second_column'] )
+                ),
+                
+                // Column-to-Static Parameter binding check
+                'OnValue' => sprintf(
+                    "%s %s ?",
+                    $this->quote_identifier( $condition['column'] ),
+                    $condition['operator']
+                ),
+                
+                // Pure Nullability inspection states
+                'OnNull' => sprintf(
+                    "%s IS %sNULL",
+                    $this->quote_identifier( $condition['column'] ),
+                    $condition['not'] ? 'NOT ' : ''
+                ),
+                
+                // Nested structural brace loop segments
+                'OnGroup' => sprintf(
+                    "(%s)",
+                    $this->render_join_conditions( $condition['conditions'] )
+                ),
+
+                default => throw new \InvalidArgumentException( 
+                    "Unsupported relational join condition element type: \"{$condition['type']}\"" 
+                )
+            };
+
+            $parts[] = $connector . $clause;
+        }
+
+        return implode( '', $parts );
     }
 
     /**
