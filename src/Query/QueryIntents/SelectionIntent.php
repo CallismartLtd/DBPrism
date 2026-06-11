@@ -149,7 +149,7 @@ class SelectionIntent implements QueryIntentInterface{
      * Append a scalar subquery expression cleanly using an independent query sandbox.
      * 
      * @param callable $callback Configures a fresh SelectionIntent sandbox instance.
-     * @param string   $alias    The column output projection naming marker.
+     * @param string    $alias    The column output projection naming marker.
      * @return static
      */
     public function select_subquery( callable $callback, string $alias ) : static {
