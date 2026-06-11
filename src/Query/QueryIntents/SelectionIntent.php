@@ -146,6 +146,37 @@ class SelectionIntent implements QueryIntentInterface{
     }
 
     /**
+     * Append a scalar subquery expression cleanly using an independent query sandbox.
+     * 
+     * @param callable $callback Configures a fresh SelectionIntent sandbox instance.
+     * @param string   $alias    The column output projection naming marker.
+     * @return static
+     */
+    public function select_subquery( callable $callback, string $alias ) : static {
+        $subquery_intent = $this->get_selection_intent();
+
+        $callback( $subquery_intent );
+
+        $compiled_sql = $subquery_intent->build();
+
+        if ( str_ends_with( $compiled_sql, ';' ) ) {
+            $compiled_sql = rtrim( $compiled_sql, ';' );
+        }
+        
+        $this->columns[] = [
+            'type'  => 'expression',
+            'value' => DefaultColumnValue::expression( "( {$compiled_sql} )" ),
+            'alias' => $alias
+        ];
+
+        foreach ( $subquery_intent->get_bindings() as $sub_binding ) {
+            $this->bindings[] = $sub_binding;
+        }
+
+        return $this;
+    }
+
+    /**
      * Set the distinct flag
      * 
      * @param bool $value

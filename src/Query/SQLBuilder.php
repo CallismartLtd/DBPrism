@@ -131,6 +131,25 @@ class SQLBuilder {
         
         return $this->active_intent;
     }
+    
+    /**
+     * Start a SELECT query initialized with a clean scalar subquery expression column.
+     * * @param callable $callback Receives a fresh SelectionIntent query sandbox instance.
+     * @param string   $alias    The column output projection naming marker.
+     * @return SelectionIntent
+     */
+    public function select_subquery( callable $callback, string $alias ) : SelectionIntent {
+        $this->reset_intent();
+        $this->type             = 'SELECT';
+        
+        $intent = SelectionIntent::make( $this );
+        
+        $intent->select_subquery( $callback, $alias );
+        
+        $this->active_intent = $intent;
+        
+        return $this->active_intent;
+    }
 
     /**
      * Start an INSERT query.
