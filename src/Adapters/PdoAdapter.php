@@ -132,7 +132,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
      *
      * @return void
      */
-    protected function close() : void {
+    public function close() : void {
         $this->pdo = null;
     }
 

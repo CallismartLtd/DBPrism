@@ -106,7 +106,7 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      *
      * @return void
      */
-    protected function close() : void {
+    public function close() : void {
         if ( $this->sqlite ) {
             $this->sqlite->close();
         }

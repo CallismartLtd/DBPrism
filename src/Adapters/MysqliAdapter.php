@@ -127,7 +127,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      *
      * @return void
      */
-    protected function close() : void {
+    public function close() : void {
         if ( $this->mysqli ) {
             $this->mysqli->close();
         }

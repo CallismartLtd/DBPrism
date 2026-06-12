@@ -173,4 +173,9 @@ interface DatabaseAdapterInterface {
      * @return DBConfigDTO
      */
     public function get_config() : DBConfigDTO;
+
+    /**
+     * Close the active database connection.
+     */
+    public function close() : void;
 }

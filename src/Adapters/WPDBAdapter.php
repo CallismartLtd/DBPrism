@@ -64,7 +64,7 @@ class WPDBAdapter implements DatabaseAdapterInterface {
     /**
      * Close the active database connection.
      */
-    protected function close() : void {
+    public function close() : void {
         $this->wpdb->close();
     }
 

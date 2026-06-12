@@ -45,6 +45,7 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * @method \Callismart\DBPrism\DBConfigDTO get_config() Get the database protocol version.
  *
  * @method bool is_connected() Check whether the database connection is alive.
+ * @method void close() Close the active database connection.
  */
 class Database {
 
