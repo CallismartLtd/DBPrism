@@ -104,7 +104,7 @@ class Database {
         throw new \ErrorException( $message, 0, 1, $file, $line );
     }
 
-/**
+    /**
      * Execute a set of queries within a transaction block securely.
      *
      * Handles nested calls gracefully using counter gates.
