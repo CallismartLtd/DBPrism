@@ -32,14 +32,40 @@ use Callismart\DTO\DTO;
  * @property ?string $path      The file-system target path for isolated file-based databases.
  * @property ?string $dsn       A raw engine connection string override used to bypass default parameterization.
  * @property ?array  $flags     Engine-specific runtime connection attributes or configuration options.
-    * @property ?array  $ssl        SSL deployment options and authority certificates mapping.
+ * @property ?array  $ssl        SSL deployment options and authority certificates mapping.
  * @property ?string $sslmode    SSL transmission enforcement tier (PostgreSQL/MySQL).
+ * @property ?string $encryption_key Encryption key for database-level operations (e.g., MySQL TDE, SQLite encryption).
  * @property ?bool   $strict     Enforcement behavior rule modifier for SQL execution modes.
  * @property ?bool   $persistent Connection reuse strategy persistence indicator flag.
  * @property ?int    $timeout    Temporal boundary restriction constraint for connection limits.
  * @property ?array  $read       High-availability routing configuration metrics for read replicas.
  * @property ?array  $write      High-availability routing configuration metrics for write primaries.
  * @property ?bool   $sticky     Immediate transactional lookup mapping flag for replica routing.
+ * 
+ * @method void __construct( array{
+ *     'driver': ?string,
+ *     'host': ?string,
+ *     'port': ?string,
+ *     'dbname': ?string,
+ *     'username': ?string,
+ *     'password': ?string,
+ *     'charset': ?string,
+ *     'collation': ?string,
+ *     'prefix': ?string,
+ *     'socket': ?string,
+ *     'path': ?string,
+ *     'dsn': ?string,
+ *     'flags': ?array,
+ *     'ssl': ?array,
+ *     'sslmode': ?string,
+ *     'encryption_key': ?string,
+ *     'strict': ?bool,
+ *     'persistent': ?bool,
+ *     'timeout': ?int,
+ *     'read': ?array,
+ *     'write': ?array,
+ *     'sticky': ?bool,
+ * } $config = [] ) Initializes the configuration DTO with an optional associative array of parameters.
  */
 final class DBConfigDTO extends DTO {
 
@@ -67,6 +93,7 @@ final class DBConfigDTO extends DTO {
             'flags',
             'ssl',
             'sslmode',
+            'encryption_key',
             'strict',
             'persistent',
             'timeout',     
@@ -84,6 +111,7 @@ final class DBConfigDTO extends DTO {
     protected function sensitive_keys(): array {
         return [
             'password',
+            'encryption_key',
         ];
     }
 
@@ -111,6 +139,8 @@ final class DBConfigDTO extends DTO {
             'port'  => is_null( $value ) ? null : (int) $value,
 
             'flags' => is_array( $value ) ? $value : [],
+
+            'encryption_key' => is_string( $value ) ? $value : null,
 
             default => $value,
         };

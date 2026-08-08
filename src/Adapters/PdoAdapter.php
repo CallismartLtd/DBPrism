@@ -656,7 +656,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * Check connection state.
      */
     public function is_connected(): bool {
-        return isset( $this->pdo ) && $this->pdo instanceof \PDO;
+        return isset( $this->pdo ) && ( $this->pdo instanceof PDO );
     }
 
     /**

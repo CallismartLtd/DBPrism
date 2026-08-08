@@ -555,7 +555,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      * @return bool
      */
     public function is_connected(): bool {
-        return isset( $this->mysqli ) && $this->mysqli instanceof mysqli;
+        return isset( $this->mysqli ) && ( $this->mysqli instanceof mysqli );
     }
 
 }

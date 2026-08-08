@@ -349,6 +349,6 @@ class WPDBAdapter implements DatabaseAdapterInterface {
      * Check connection state.
      */
     public function is_connected(): bool {
-        return $this->wpdb instanceof wpdb && empty( $this->wpdb->error );
+        return $this->wpdb->ready;
     }
 }

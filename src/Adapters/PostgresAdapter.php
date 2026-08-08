@@ -1,7 +1,6 @@
 <?php
 namespace Callismart\DBPrism\Adapters;
 
-use PDO;
 use PDOStatement;
 use Callismart\DBPrism\PostgresCompatibilityTrait;
 

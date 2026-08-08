@@ -464,7 +464,7 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * Check connection state.
      */
     public function is_connected(): bool {
-        return isset( $this->sqlite ) && $this->sqlite instanceof \SQLite3;
+        return isset( $this->sqlite ) && ( $this->sqlite instanceof SQLite3 );
     }
 
     protected function ensure_connection() : bool {
