@@ -24,6 +24,8 @@ tests/ export-ignore
 phpunit.xml export-ignore
 .phpunit.result.cache export-ignore
 phpunit.xml.dist export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
 
 # CI / tooling
 .github export-ignore

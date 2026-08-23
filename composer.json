@@ -48,7 +48,8 @@
             "/phpunit.xml",
             "/phpunit.xml.dist",
             "/.github",
-            "/README.md"
+            "/.gitignore",
+            "/.gitattributes"
         ]
     },
     "scripts": {
