@@ -12,7 +12,6 @@ namespace Callismart\DBPrism\Adapters;
 use SQLite3;
 use Exception;
 use Callismart\DBPrism\DBConfigDTO;
-use Callismart\DBPrism\SqliteCompatibilityTrait;
 use SQLite3Result;
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
 
@@ -20,8 +19,6 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * Adapter for native SQLite3 database access.
  */
 class SqliteAdapter implements DatabaseAdapterInterface {
-    use SqliteCompatibilityTrait;
-
     /**
      * The SQLite3 connection instance.
      *
@@ -161,7 +158,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
 
         try {
 
-            $query  = $this->translate_mysql_to_sqlite( $query );
             $stmt   = $this->sqlite->prepare( $query );
 
             if ( ! $stmt ) {
@@ -187,8 +183,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
             if ( preg_match( '/^\s*INSERT\s+/i', $query ) ) {
                 $this->insert_id = $this->sqlite->lastInsertRowID();
             }
-
-            $stmt->close();
 
             return $result;
         } catch ( \Exception $e ) {
@@ -226,6 +220,9 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         if ( ! $result ) return null;
         
         $row = $result->fetchArray( SQLITE3_ASSOC );
+
+        $result->finalize();
+
         return $row ?: null;
     }
 
@@ -247,6 +244,9 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
             $rows[] = $row;
         }
+
+        $result->finalize();
+
         return $rows;
     }
 
@@ -264,6 +264,9 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         if ( ! $result ) return null;
 
         $row = $result->fetchArray( SQLITE3_NUM );
+
+        $result->finalize();
+
         return $row ? $row[0] : null;
     }
 
@@ -275,19 +278,18 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return array List of column values.
      */
     public function get_col( $query, array $params = [] ) : array {
-        if ( ! $this->ensure_connection() ) {
-            return [];
-        }
-
         $this->last_error = null;
 
         $result = $this->query( $query, $params );
+
         if ( ! $result ) return [];
 
         $cols = [];
         while ( $row = $result->fetchArray( SQLITE3_NUM ) ) {
             $cols[] = $row[0];
         }
+
+        $result->finalize();
         return $cols;
     }
 
@@ -299,10 +301,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false The inserted record ID on success, false on failure.
      */
     public function insert( $table, array $data ) : int|false {
-        if ( ! $this->ensure_connection() ) {
-            return false;
-        }
-
         $this->last_error = null;
 
         $columns = array_keys( $data );
@@ -328,9 +326,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false Number of affected rows, or false on failure.
      */
     public function update( $table, array $data, array $where ) : int|false {
-        if ( ! $this->ensure_connection() ) {
-            return false;
-        }
 
         $this->last_error = null;
 
@@ -358,9 +353,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return int|false Number of affected rows, or false on failure.
      */
     public function delete( $table, array $where ) : int|false {
-        if ( ! $this->ensure_connection() ) {
-            return false;
-        }
 
         $this->last_error = null;
 
@@ -419,7 +411,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         $this->last_error = null;
 
         try {
-            $query = $this->translate_mysql_to_sqlite( $query );
 
             $result = $this->sqlite->exec( $query );
 
