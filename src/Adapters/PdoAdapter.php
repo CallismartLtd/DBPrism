@@ -245,8 +245,9 @@ class PdoAdapter implements DatabaseAdapterInterface {
         }
 
         return sprintf(
-            'sqlite:%s',
-            $this->config->path
+            'sqlite:%s/%s',
+            rtrim( $this->config->path, '/' ),
+            $this->config->dbname
         );
     }
 
