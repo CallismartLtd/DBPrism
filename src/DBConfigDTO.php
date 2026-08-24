@@ -20,9 +20,9 @@ use Callismart\DTO\DTO;
  * exposure through debugging or serialization.
  * 
  * @property string  $driver    The database adapter engine target (e.g., 'mysql', 'sqlite', 'pgsql').
+ * @property string $dbname     The name of the target database or schema.
  * @property ?string $host      The database server network hostname or IP address.
  * @property ?string $port      The database server network communication port.
- * @property ?string $dbname    The name of the target database or schema.
  * @property ?string $username  The connection authentication identity string.
  * @property ?string $password  The connection authentication credential secret.
  * @property ?string $charset   The text character encoding layout specification.
@@ -43,10 +43,10 @@ use Callismart\DTO\DTO;
  * @property ?bool   $sticky     Immediate transactional lookup mapping flag for replica routing.
  * 
  * @method void __construct( array{
- *     'driver': ?string,
+ *     'driver': string,
+ *     'dbname': string,
  *     'host': ?string,
  *     'port': ?string,
- *     'dbname': ?string,
  *     'username': ?string,
  *     'password': ?string,
  *     'charset': ?string,
