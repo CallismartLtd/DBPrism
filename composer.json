@@ -32,7 +32,10 @@
     "autoload-dev": {
         "files": [
             "tests/Functions.php"
-        ]
+        ],
+        "psr-4": {
+            "Callismart\\DBPrism\\Tests\\": "tests/"
+        }
     },
     "authors": [
         {
@@ -53,6 +56,19 @@
         ]
     },
     "scripts": {
-        "test": "phpunit --colors=always --testdox"
+        "test": "phpunit --colors=always --testdox --display-warnings --display-deprecations",
+
+        "test:intent": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Intent Tests\"",
+        "test:renderer": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Renderer Tests\"",
+        "test:utils": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Utils Tests\"",
+        "test:connection": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Connection Tests\"",
+
+        "test:dbconn:mysqli": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=MysqliAdapterTest",
+        "test:dbconn:pdo-mysql": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=PdoMysqlTest",
+        "test:dbconn:pdo-pgsql": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=PdoPostgresTest",
+        "test:dbconn:pdo-sqlite": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=PdoSqliteTest",
+        "test:dbconn:all": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Connection Tests\"",
+
+        "test:all": "phpunit --colors=always --testdox --display-warnings --display-deprecations"
     }
 }

@@ -29,9 +29,9 @@
         <!-- PostgreSQL Credentials -->
         <env name="PGSQL_HOST" value="127.0.0.1" />
         <env name="PGSQL_PORT" value="5432" />
-        <env name="PGSQL_USER" value="apiv1" />
-        <env name="PGSQL_PASS" value="apiv1" />
-        <env name="PGSQL_DB"   value="apiv1" />
+        <env name="PGSQL_USER" value="dbprism_test" />
+        <env name="PGSQL_PASS" value="dbprism_test" />
+        <env name="PGSQL_DB"   value="dbprism_test" />
 
         <!-- SQLite Database Path -->
         <env name="SQLITE_PATH" value=":memory:" />

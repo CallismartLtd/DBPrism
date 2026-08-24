@@ -77,9 +77,7 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         try {
             $this->last_error = null;
 
-            $path       = $this->config->path;
-            $dbname     = $this->config->dbname;
-            $filename   = "$path/$dbname.db";
+            $filename   = $this->build_sqlite_path();
 
             $flags      = $this->config->flags ?? ( SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE );
             $encryption = $this->config->encryption_key ?? '';
@@ -471,5 +469,34 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         }
 
         return true;
+    }
+
+    /**
+     * Build the filesystem path or memory string for the SQLite3 instance.
+     *
+     * @return string Valid SQLite3 database file path or :memory:.
+     * @throws Exception If database name is missing.
+     */
+    protected function build_sqlite_path() : string {
+        $dbname = $this->config->dbname ?? '';
+
+        if ( empty( $dbname ) ) {
+            throw new \Exception( 'SQLite database name or path was not specified.' );
+        }
+
+        // Handle in-memory database target
+        if ( ':memory:' === $dbname ) {
+            return ':memory:';
+        }
+
+        // If path is not set, treat dbname as an explicit absolute or relative path
+        if ( empty( $this->config->path ) ) {
+            return $dbname;
+        }
+
+        $path     = \rtrim( $this->config->path, '/\\' );
+        $filename = \str_contains( $dbname, '.' ) ? $dbname : "{$dbname}.db";
+
+        return "{$path}" . DIRECTORY_SEPARATOR . "{$filename}";
     }
 }

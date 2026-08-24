@@ -76,9 +76,11 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             if ( $this->is_connected() ) {
                 return true;
             }
-            
-            // Suppress connection error output.
-            $mysqli = @new mysqli(
+
+            // Force strict exception reporting across all PHP 8.x versions
+            mysqli_report( MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT );
+
+            $mysqli = new mysqli(
                 $this->config->host,
                 $this->config->username,
                 $this->config->password,
@@ -95,15 +97,16 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             $this->mysqli = $mysqli;
             $this->mysqli->set_charset( $this->config->charset ?? 'utf8mb4' );
             return true;
-        } catch( Throwable $th ) {
-            $this->last_error   = $th->getMessage();
+        } catch ( Throwable $th ) {
+            $this->last_error = $th->getMessage();
+            $this->mysqli     = null;
 
             return false;
         }
     }
 
     /**
-     * Ensure database connection
+     * Ensure database connection.
      * 
      * @return bool
      */
@@ -115,7 +118,9 @@ class MysqliAdapter implements DatabaseAdapterInterface {
         $this->connect();
 
         if ( ! $this->is_connected() ) {
-            $this->last_error = 'No active MySQLi connection.';
+            if ( empty( $this->last_error ) ) {
+                $this->last_error = 'No active MySQLi connection.';
+            }
             return false;
         }
 
@@ -129,7 +134,11 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function close() : void {
         if ( $this->mysqli ) {
-            $this->mysqli->close();
+            try {
+                $this->mysqli->close();
+            } catch ( Throwable $e ) {
+                // Connection clean up
+            }
         }
 
         $this->mysqli = null;
@@ -142,7 +151,11 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function begin_transaction() : void {
         if ( $this->ensure_connection() ) {
-            $this->mysqli->begin_transaction();
+            try {
+                $this->mysqli->begin_transaction();
+            } catch ( mysqli_sql_exception $e ) {
+                $this->last_error = $e->getMessage();
+            }
         }
     }
 
@@ -153,7 +166,11 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function commit() : void {
         if ( $this->mysqli ) {
-            $this->mysqli->commit();
+            try {
+                $this->mysqli->commit();
+            } catch ( mysqli_sql_exception $e ) {
+                $this->last_error = $e->getMessage();
+            }
         }
     }
 
@@ -164,7 +181,11 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function rollback() : void {
         if ( $this->mysqli ) {
-            $this->mysqli->rollback();
+            try {
+                $this->mysqli->rollback();
+            } catch ( mysqli_sql_exception $e ) {
+                $this->last_error = $e->getMessage();
+            }
         }
     }
 
@@ -175,40 +196,48 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      * @param array  $params Values to bind in the query.
      * @return mysqli_stmt|false Prepared statement on success, false on failure.
      */
-    protected function query( $query, array $params = [] ) : mysqli_stmt|false {
-        if ( ! $this->ensure_connection() ) {
-            return false;
-        }
+    protected function query( string $query, array $params = [] ) : mysqli_stmt|false {
+        $this->last_error = null;
 
-        $stmt = $this->mysqli->prepare( $query );
+        try {
+            if ( ! $this->ensure_connection() ) {
+                return false;
+            }
 
-        if ( ! $stmt ) {
-            $this->last_error = 'Prepare failed: ' . $this->mysqli->error;
-            return false;
-        }
+            $stmt = $this->mysqli->prepare( $query );
 
-        if ( ! empty( $params ) ) {
-            $types = $this->get_bind_types( $params );
-            
-            if ( ! $stmt->bind_param( $types, ...$params ) ) {
-                $this->last_error = 'Bind param failed: ' . $stmt->error;
+            if ( ! $stmt ) {
+                $this->last_error = 'Prepare failed: ' . $this->mysqli->error;
+                return false;
+            }
+
+            if ( ! empty( $params ) ) {
+                $types = $this->get_bind_types( $params );
+
+                if ( ! $stmt->bind_param( $types, ...$params ) ) {
+                    $this->last_error = 'Bind param failed: ' . $stmt->error;
+                    $stmt->close();
+                    return false;
+                }
+            }
+
+            if ( ! $stmt->execute() ) {
+                $this->last_error = 'Execute failed: ' . $stmt->error;
                 $stmt->close();
                 return false;
             }
-        }
 
-        if ( ! $stmt->execute() ) {
-            $this->last_error = 'Execute failed: ' . $stmt->error;
-            $stmt->close();
+            // Store insert ID for INSERT queries
+            if ( $this->mysqli->insert_id > 0 ) {
+                $this->insert_id = $this->mysqli->insert_id;
+            }
+
+            return $stmt;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
+
             return false;
         }
-
-        // Store insert ID for INSERT queries
-        if ( $this->mysqli->insert_id > 0 ) {
-            $this->insert_id = $this->mysqli->insert_id;
-        }
-
-        return $stmt;
     }
 
     /**
@@ -219,19 +248,17 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     protected function get_bind_types( array $params ) : string {
         $types = '';
-        
+
         foreach ( $params as $param ) {
             if ( is_int( $param ) ) {
                 $types .= 'i';
             } elseif ( is_float( $param ) ) {
                 $types .= 'd';
-            } elseif ( is_string( $param ) ) {
-                $types .= 's';
             } else {
-                $types .= 's'; // Default to string for other types
+                $types .= 's';
             }
         }
-        
+
         return $types;
     }
 
@@ -242,24 +269,30 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      * @param array  $params Values to bind in the query.
      * @return array|null Associative array of the row, or null if not found.
      */
-    public function get_row( $query, $params = [] ) : ?array{
+    public function get_row( $query, $params = [] ) : ?array {
         $stmt = $this->query( $query, $params );
-        
+
         if ( false === $stmt ) {
             return null;
         }
 
-        $result = $stmt->get_result();
-        
-        if ( ! $result ) {
+        try {
+            $result = $stmt->get_result();
+
+            if ( ! $result ) {
+                $stmt->close();
+                return null;
+            }
+
+            $row = $result->fetch_assoc();
+            $stmt->close();
+
+            return $row ?: null;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
             $stmt->close();
             return null;
         }
-
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        return $row ?: null;
     }
 
     /**
@@ -272,25 +305,31 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function get_results( $query, $params = [] ) : array {
         $stmt = $this->query( $query, $params );
-        
+
         if ( false === $stmt ) {
             return [];
         }
 
-        $result = $stmt->get_result();
-        
-        if ( ! $result ) {
+        try {
+            $result = $stmt->get_result();
+
+            if ( ! $result ) {
+                $stmt->close();
+                return [];
+            }
+
+            $rows = [];
+            while ( $row = $result->fetch_assoc() ) {
+                $rows[] = $row;
+            }
+
+            $stmt->close();
+            return $rows;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
             $stmt->close();
             return [];
         }
-
-        $rows = [];
-        while ( $row = $result->fetch_assoc() ) {
-            $rows[] = $row;
-        }
-
-        $stmt->close();
-        return $rows;
     }
 
     /**
@@ -302,22 +341,28 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function get_var( $query, $params = [] ) : mixed {
         $stmt = $this->query( $query, $params );
-        
+
         if ( false === $stmt ) {
             return null;
         }
 
-        $result = $stmt->get_result();
-        
-        if ( ! $result ) {
+        try {
+            $result = $stmt->get_result();
+
+            if ( ! $result ) {
+                $stmt->close();
+                return null;
+            }
+
+            $row = $result->fetch_array( MYSQLI_NUM );
+            $stmt->close();
+
+            return $row ? $row[0] : null;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
             $stmt->close();
             return null;
         }
-
-        $row = $result->fetch_array( MYSQLI_NUM );
-        $stmt->close();
-        
-        return $row ? $row[0] : null;
     }
 
     /**
@@ -329,25 +374,31 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function get_col( $query, $params = [] ) : array {
         $stmt = $this->query( $query, $params );
-        
+
         if ( false === $stmt ) {
             return [];
         }
 
-        $result = $stmt->get_result();
-        
-        if ( ! $result ) {
+        try {
+            $result = $stmt->get_result();
+
+            if ( ! $result ) {
+                $stmt->close();
+                return [];
+            }
+
+            $column = [];
+            while ( $row = $result->fetch_array( MYSQLI_NUM ) ) {
+                $column[] = $row[0];
+            }
+
+            $stmt->close();
+            return $column;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
             $stmt->close();
             return [];
         }
-
-        $column = [];
-        while ( $row = $result->fetch_array( MYSQLI_NUM ) ) {
-            $column[] = $row[0];
-        }
-
-        $stmt->close();
-        return $column;
     }
 
     /**
@@ -358,7 +409,6 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      * @return int|false The inserted record ID on success, false on failure.
      */
     public function insert( $table, $data ) : int|false {
-
         if ( ! $this->ensure_connection() ) {
             return false;
         }
@@ -368,7 +418,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        $columns = array_keys( $data );
+        $columns      = array_keys( $data );
         $placeholders = array_fill( 0, count( $data ), '?' );
 
         $query = sprintf(
@@ -379,7 +429,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
         );
 
         $params = array_values( $data );
-        $stmt = $this->query( $query, $params );
+        $stmt   = $this->query( $query, $params );
 
         if ( false === $stmt ) {
             return false;
@@ -407,12 +457,10 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        // Build SET clause with ? placeholders
         $set_clauses = array_map( function( $column ) {
             return "$column = ?";
         }, array_keys( $data ) );
 
-        // Build WHERE clause with ? placeholders
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
         }, array_keys( $where ) );
@@ -424,10 +472,8 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             implode( ' AND ', $where_clauses )
         );
 
-        // Merge data and where values for positional binding
         $params = array_merge( array_values( $data ), array_values( $where ) );
-        
-        $stmt = $this->query( $query, $params );
+        $stmt   = $this->query( $query, $params );
 
         if ( false === $stmt ) {
             return false;
@@ -435,7 +481,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
 
         $affected_rows = $stmt->affected_rows;
         $stmt->close();
-        
+
         return $affected_rows;
     }
 
@@ -456,7 +502,6 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        // Build WHERE clause with ? placeholders
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
         }, array_keys( $where ) );
@@ -468,7 +513,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
         );
 
         $params = array_values( $where );
-        $stmt = $this->query( $query, $params );
+        $stmt   = $this->query( $query, $params );
 
         if ( false === $stmt ) {
             return false;
@@ -476,7 +521,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
 
         $affected_rows = $stmt->affected_rows;
         $stmt->close();
-        
+
         return $affected_rows;
     }
 
@@ -520,33 +565,47 @@ class MysqliAdapter implements DatabaseAdapterInterface {
             return false;
         }
 
-        $result = $this->mysqli->multi_query( $query );
+        $this->last_error = null;
 
-        if ( false === $result ) {
-            $this->last_error = $this->mysqli->error;
+        try {
+            $result = $this->mysqli->multi_query( $query );
+
+            if ( false === $result ) {
+                $this->last_error = $this->mysqli->error;
+                return false;
+            }
+
+            do {
+                if ( $res = $this->mysqli->store_result() ) {
+                    $res->free();
+                }
+            } while ( $this->mysqli->more_results() && $this->mysqli->next_result() );
+
+            return true;
+        } catch ( mysqli_sql_exception $e ) {
+            $this->last_error = $e->getMessage();
             return false;
         }
-
-        do {
-            if ( $res = $this->mysqli->store_result() ) {
-                $res->free();
-            }
-        } while ( $this->mysqli->more_results() && $this->mysqli->next_result() );
-
-        return true;
     }
 
     /**
      * {@inheritDoc}
      */
     public function execute( string $query, array $params = [] ) : int {
-        if ( ! $this->ensure_connection()  ) {
+        if ( ! $this->ensure_connection() ) {
             return 0;
         }
 
-        $stmt   = $this->query( $query, $params );
+        $stmt = $this->query( $query, $params );
 
-        return (int) ( $stmt ? $stmt->affected_rows : 0 );
+        if ( false === $stmt ) {
+            return 0;
+        }
+
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+
+        return $affected;
     }
 
     /**

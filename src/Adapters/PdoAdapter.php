@@ -88,9 +88,9 @@ class PdoAdapter implements DatabaseAdapterInterface {
             $dsn    = $this->build_dsn();
 
             $flags  = (array) $this->config->flags ?? [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_ERRMODE               => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE    => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES      => false,
             ];
 
             $this->pdo = new PDO(
@@ -101,7 +101,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
             );
 
             return true;
-        } catch ( PDOException $e ) {
+        } catch ( \Throwable $e ) {
             $this->last_error = $e->getMessage();
             return false;
         }
@@ -236,19 +236,30 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * Build SQLite DSN string.
      *
      * @return string
-     * @throws PDOException
+     * @throws PDOException If SQLite database path/database name is invalid or missing.
      */
     protected function build_sqlite_dsn() : string {
+        $dbname = $this->config->dbname ?? '';
 
-        if ( ! isset( $this->config->path ) ) {
-            throw new PDOException( 'SQLite database path was not specified.' );
+        if ( empty( $dbname ) ) {
+            throw new PDOException( 'SQLite database name or path was not specified.' );
         }
 
-        return sprintf(
-            'sqlite:%s/%s',
-            rtrim( $this->config->path, '/' ),
-            $this->config->dbname
-        );
+        // Handle in-memory database targets
+        if ( ':memory:' === $dbname ) {
+            return 'sqlite::memory:';
+        }
+
+        // If $dbname is already an absolute path or relative file path
+        // (e.g., /var/db/app.sqlite or database.sqlite).
+        if ( empty( $this->config->path ) ) {
+            return "sqlite:{$dbname}";
+        }
+
+        $path     = rtrim( $this->config->path, '/\\' );
+        $filename = str_contains( $dbname, '.' ) ? $dbname : "{$dbname}.db";
+
+        return "sqlite:{$path}/{$filename}";
     }
 
     /**
@@ -292,7 +303,11 @@ class PdoAdapter implements DatabaseAdapterInterface {
             return;
         }
 
-        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->beginTransaction();
+        } catch ( PDOException $e ) {
+            $this->last_error = $e->getMessage();
+        }
     }
 
     /**
@@ -301,8 +316,14 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * @return void
      */
     public function commit() : void {
-        if ( $this->pdo && $this->pdo->inTransaction() ) {
+        if ( ! $this->pdo || ! $this->pdo->inTransaction() ) {
+            return;
+        }
+
+        try {
             $this->pdo->commit();
+        } catch ( PDOException $e ) {
+            $this->last_error = $e->getMessage();
         }
     }
 
@@ -312,8 +333,14 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * @return void
      */
     public function rollback() : void {
-        if ( $this->pdo && $this->pdo->inTransaction() ) {
+        if ( ! $this->pdo || ! $this->pdo->inTransaction() ) {
+            return;
+        }
+
+        try {
             $this->pdo->rollBack();
+        } catch ( PDOException $e ) {
+            $this->last_error = $e->getMessage();
         }
     }
 
@@ -639,18 +666,22 @@ class PdoAdapter implements DatabaseAdapterInterface {
      * {@inheritdoc}
      */
     public function execute( string $query, array $params = [] ) : int {
-        $stmt   = $this->query( $query, $params );
+        $stmt = $this->query( $query, $params );
 
         if ( ! $stmt ) {
             return 0;
         }
 
-        if ( $this->pdo->lastInsertId() ) {
-            $this->insert_id    = (int) $this->pdo->lastInsertId();
+        try {
+            $last_id = $this->pdo->lastInsertId();
+            if ( $last_id ) {
+                $this->insert_id = (int) $last_id;
+            }
+            return $stmt->rowCount();
+        } catch ( PDOException $e ) {
+            $this->last_error = $e->getMessage();
+            return 0;
         }
-
-        return $stmt->rowCount();
-
     }
 
     /**
