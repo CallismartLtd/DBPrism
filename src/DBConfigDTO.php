@@ -116,6 +116,13 @@ final class DBConfigDTO extends DTO {
     }
 
     /**
+     * {@inheritdoc}
+     */
+    protected function required_keys(): array {
+        return ['driver', 'dbname'];
+    }
+
+    /**
      * Cast values to expected types where appropriate.
      *
      * @param string $key
