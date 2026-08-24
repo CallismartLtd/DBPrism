@@ -286,9 +286,9 @@ class PostgresInspector extends AbstractInspector {
                 current_schema() AS schema_name,
                 current_setting( 'server_version' ) AS server_version,
                 current_setting( 'server_encoding' ) AS charset,
-                current_setting( 'lc_collate' ) AS collation,
+                ( SELECT datcollate FROM pg_database WHERE datname = current_database() ) AS collation,
                 current_setting( 'TimeZone' ) AS timezone,
-                current_setting( 'lc_messages' ) AS locale,
+                current_setting( 'lc_monetary' ) AS locale,
                 inet_server_addr() AS server_address,
                 inet_server_port() AS server_port,
                 pg_is_in_recovery() AS in_recovery

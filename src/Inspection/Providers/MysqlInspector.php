@@ -345,8 +345,8 @@ class MysqlInspector extends AbstractInspector {
                 @@version_compile_machine AS server_architecture,
                 @@hostname AS server_hostname,
                 @@port AS server_port,
-                @@character_set_database AS charset,
-                @@collation_database AS collation,
+                @@character_set_connection AS charset,
+                @@collation_connection AS collation,
                 @@time_zone AS timezone,
                 @@lc_time_names AS locale,
                 @@default_storage_engine AS default_engine,
@@ -363,11 +363,18 @@ class MysqlInspector extends AbstractInspector {
         }
 
         $ssl_status = $this->dbal->get_row( "SHOW SESSION STATUS LIKE 'Ssl_cipher'" );
-        $is_ssl     = is_array( $ssl_status ) && ! empty( $ssl_status['Value'] );
+        $cipher_val = '';
 
-        $version_str = $row['server_version'] ?? '';
+        if ( is_array( $ssl_status ) ) {
+            $cipher_val = $ssl_status['Value'] ?? $ssl_status['value'] ?? '';
+        }
+
+        $is_ssl      = ! empty( $cipher_val ) && 'NONE' !== strtoupper( (string) $cipher_val );
+        $version_str = (string) ( $row['server_version'] ?? '' );
+        $comment_str = (string) ( $row['version_comment'] ?? '' );
+
         $is_mariadb  = false !== stripos( $version_str, 'MariaDB' ) 
-                    || false !== stripos( $row['version_comment'] ?? '', 'MariaDB' );
+                    || false !== stripos( $comment_str, 'MariaDB' );
 
         return array(
             'engine'              => 'mysql',

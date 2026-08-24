@@ -431,22 +431,27 @@ class SQLiteInspector extends AbstractInspector {
     protected function inspect_database_info(): array {
         $version = $this->dbal->get_var( 'SELECT sqlite_version()' );
 
-        if ( null === $version ) {
+        if ( null === $version || '' === $version ) {
             return array();
         }
 
         $fetch_pragma = function( string $pragma ): mixed {
-            $row = $this->dbal->get_row( sprintf( 'PRAGMA %s', $pragma ) );
+            // Strip anything that isn't a safe pragma identifier
+            $clean_pragma = preg_replace( '/[^a-zA-Z0-9_]/', '', $pragma );
+            $row          = $this->dbal->get_row( sprintf( 'PRAGMA %s', $clean_pragma ) );
 
-            if ( empty( $row ) ) {
+            if ( ! is_array( $row ) || empty( $row ) ) {
                 return null;
             }
 
-            return reset( $row );
+            // Always fetch the first column value safely regardless of array keys
+            $values = array_values( $row );
+            return $values[0] ?? null;
         };
 
         $page_size  = (int) $fetch_pragma( 'page_size' );
         $page_count = (int) $fetch_pragma( 'page_count' );
+        $hostname   = @gethostname();
 
         return array(
             'engine'              => 'sqlite',
@@ -460,14 +465,14 @@ class SQLiteInspector extends AbstractInspector {
             'socket'              => null,
             'path'                => null,
             'ssl'                 => false,
-            'charset'             => (string) $fetch_pragma( 'encoding' ),
+            'charset'             => (string) ( $fetch_pragma( 'encoding' ) ?? 'UTF-8' ),
             'collation'           => 'BINARY',
             'timezone'            => 'UTC',
             'locale'              => null,
             'schema'              => 'main',
-            'server_os'           => PHP_OS,
+            'server_os'           => PHP_OS_FAMILY,
             'server_architecture' => null,
-            'server_hostname'     => gethostname() ?: null,
+            'server_hostname'     => false !== $hostname ? $hostname : null,
             'capabilities'        => array(
                 'transactions' => true,
                 'foreign_keys' => (bool) $fetch_pragma( 'foreign_keys' ),

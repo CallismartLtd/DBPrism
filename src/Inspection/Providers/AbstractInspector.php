@@ -82,37 +82,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * @return DatabaseInfoDTO
 	 */
 	public function get_database_info(): DatabaseInfoDTO {
-		$config = $this->get_config();
-
-		$info = array(
-			'driver'         => $this->get_engine_type(),
-			'database'       => $this->db_name(),
-			'server_version' => $this->get_server_version(),
-			'protocol'       => $this->get_protocol_version(),
-
-			/*
-			 * These are configuration fallbacks. Concrete inspectors should
-			 * replace them with database-reported values where available.
-			 */
-			'host'            => $config->host,
-			'port'            => $config->port,
-			'charset'         => $config->charset,
-			'collation'       => $config->collation,
-			'socket'          => $config->socket,
-			'path'            => $config->path,
-
-			/*
-			 * Human-readable connection description. Concrete inspectors can
-			 * override this through inspect_database_info().
-			 */
-			'connection'      => $this->get_host_info(),
-		);
-
-		$engine_info = $this->inspect_database_info();
-
-		return new DatabaseInfoDTO(
-			array_merge( $info, $engine_info )
-		);
+		return new DatabaseInfoDTO( $this->inspect_database_info() );
 	}
 
 	/**

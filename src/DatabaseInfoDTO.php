@@ -74,7 +74,7 @@ use Callismart\DTO\DTO;
  *     'capabilities': ?array,
  *     'features': ?array,
  *     'runtime': ?array,
- * }) $config = []
+ * } $config = [] )
  */
 final class DatabaseInfoDTO extends DTO {
 
