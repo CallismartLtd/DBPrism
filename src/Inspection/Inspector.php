@@ -19,29 +19,74 @@ use Callismart\DBPrism\Inspection\Providers\SQLiteInspector;
  * Database Schema Inspection Facade
  *
  * Provides a static proxy to an underlying database inspection engine implementation.
- * This facade exposes an engine-agnostic API for schema introspection across supported
- * database drivers such as MySQL, PostgreSQL, and SQLite.
+ * This facade exposes an engine-agnostic API for database, connection, and schema
+ * introspection across supported database drivers such as MySQL, PostgreSQL, and SQLite.
  *
- * @method static array get_all_tables() Retrieve a list of all tables in the current database.
- * @method static bool table_exists(string $table) Check if a table exists.
- * @method static bool column_exists(string $table, string $column) Check if a column exists in a table.
- * @method static string|null get_column_type(string $table, string $column) Get the type of a column.
- * @method static array get_columns(string $table) Get all column names in a table.
- * @method static array get_column_details(string $table) Get detailed column metadata for a table.
- * @method static bool has_index(string $table, string $index_name) Check if an index exists on the table.
- * @method static array get_indexes(string $table) Get all indexes for a table.
- * @method static array|null get_primary_key(string $table) Get primary key column(s) for a table.
- * @method static array get_foreign_keys(string $table) Get all foreign key constraints for a table.
- * @method static bool has_foreign_key(string $table, string $constraint) Check if a foreign key constraint exists.
- * @method static array get_unique_constraints(string $table) Get all unique constraints for a table.
- * @method static array get_check_constraints(string $table) Get all check constraints for a table.
- * @method static array get_table_metadata(string $table) Get metadata about a table (engine, charset, etc.).
- * @method static bool|null is_column_nullable(string $table, string $column) Check if a column is nullable.
- * @method static mixed get_column_default(string $table, string $column) Get default value of a column.
- * @method static string get_host_info() Get information about the database connection host.
- * @method static string|int|null get_protocol_version() Retrieve database protocol version.
- * @method static string get_server_version() Get database server version.
- * @method static string get_engine_type() Get database engine type (mysql, pgsql, sqlite).
+ * @method static DatabaseInfoDTO get_database_info()
+ *     Retrieve comprehensive database engine, server, connection, and runtime
+ *     information. Values reported directly by the database engine take precedence
+ *     over configuration values supplied through DBConfigDTO.
+ *
+ * @method static array get_all_tables()
+ *     Retrieve a list of all tables in the current database.
+ *
+ * @method static bool table_exists(string $table)
+ *     Check if a table exists.
+ *
+ * @method static bool column_exists(string $table, string $column)
+ *     Check if a column exists in a table.
+ *
+ * @method static string|null get_column_type(string $table, string $column)
+ *     Get the type of a column.
+ *
+ * @method static array get_columns(string $table)
+ *     Get all column names in a table.
+ *
+ * @method static array get_column_details(string $table)
+ *     Get detailed column metadata for a table.
+ *
+ * @method static bool has_index(string $table, string $index_name)
+ *     Check if an index exists on the table.
+ *
+ * @method static array get_indexes(string $table)
+ *     Get all indexes for a table.
+ *
+ * @method static array|null get_primary_key(string $table)
+ *     Get primary key column(s) for a table.
+ *
+ * @method static array get_foreign_keys(string $table)
+ *     Get all foreign key constraints for a table.
+ *
+ * @method static bool has_foreign_key(string $table, string $constraint)
+ *     Check if a foreign key constraint exists.
+ *
+ * @method static array get_unique_constraints(string $table)
+ *     Get all unique constraints for a table.
+ *
+ * @method static array get_check_constraints(string $table)
+ *     Get all check constraints for a table.
+ *
+ * @method static array get_table_metadata(string $table)
+ *     Get metadata about a table, including engine, charset, collation,
+ *     approximate row count, and comment where supported.
+ *
+ * @method static bool|null is_column_nullable(string $table, string $column)
+ *     Check if a column is nullable.
+ *
+ * @method static mixed get_column_default(string $table, string $column)
+ *     Get the default value of a column.
+ *
+ * @method static string get_host_info()
+ *     Get information about the database connection endpoint.
+ *
+ * @method static string|int|null get_protocol_version()
+ *     Retrieve the database protocol version.
+ *
+ * @method static string get_server_version()
+ *     Get the database server version.
+ *
+ * @method static string get_engine_type()
+ *     Get the database engine type, such as mysql, pgsql, or sqlite.
  */
 class Inspector {
     /**
