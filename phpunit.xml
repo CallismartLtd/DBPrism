@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php" colors="true">
+    <testsuites>
+        <testsuite name="DBPrism Intent Tests">
+            <directory>tests/Query/Intent</directory>
+        </testsuite>
+
+        <testsuite name="DBPrism Renderer Tests">
+            <directory>tests/Query/Renderer</directory>
+        </testsuite>
+
+        <testsuite name="DBPrism Utils Tests">
+            <directory>tests/Utils</directory>
+        </testsuite>
+
+        <testsuite name="DBPrism Connection Tests">
+            <directory>tests/Connection</directory>
+        </testsuite>
+    </testsuites>
+
+    <php>
+        <!-- MySQL / MariaDB Credentials -->
+        <env name="MYSQL_HOST" value="127.0.0.1" />
+        <env name="MYSQL_PORT" value="3306" />
+        <env name="MYSQL_USER" value="dbprism_test" />
+        <env name="MYSQL_PASS" value="dbprism_test" />
+        <env name="MYSQL_DB"   value="dbprism_test" />
+
+        <!-- PostgreSQL Credentials -->
+        <env name="PGSQL_HOST" value="127.0.0.1" />
+        <env name="PGSQL_PORT" value="5432" />
+        <env name="PGSQL_USER" value="apiv1" />
+        <env name="PGSQL_PASS" value="apiv1" />
+        <env name="PGSQL_DB"   value="apiv1" />
+
+        <!-- SQLite Database Path -->
+        <env name="SQLITE_PATH" value=":memory:" />
+    </php>
+</phpunit>
