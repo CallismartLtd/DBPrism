@@ -16,8 +16,6 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * Database singleton class for Smart License Server.
  *
  * Acts as a proxy to the environment-specific database adapter.
- * 
- * @todo Use the inspection API for system report.
  *
  * @method array|null get_row( string $query, array $params = [] ) Retrieve a single row as an associative array.
  * @method array get_results( string $query, array $params = [] ) Retrieve multiple rows as an array of associative arrays.
@@ -167,10 +165,7 @@ class Database {
      *
      * @return string SQL fragment for charset and collation.
      */
-    public function get_charset_collate() {
-        // @todo: Will use the schema inspection API as some relayed method calls
-        // to the adapter interface has been removed
-        
+    public function get_charset_collate() {        
         if ( 'mysql' !== $this->get_driver() ) {
             return '';
         }
@@ -183,59 +178,6 @@ class Database {
         }
 
         return sprintf( 'DEFAULT CHARSET=%s COLLATE=%s', $charset, $collate );
-    }
-
-    /**
-     * Generate a comprehensive report of the current database environment.
-     *
-     * Useful for system health checks, debug logs, or support dashboards.
-     *
-     * @return array {
-     * @type string $engine           The driver name (mysql, sqlite, etc).
-     * @type string $server_version   The database version.
-     * @type string $protocol         The connection protocol version.
-     * @type string $host             Host or file path information.
-     * @type string|null $last_error  The most recent error message.
-     * @type bool   $connection_alive Whether the connection is currently active.
-     * }
-     */
-    public function get_system_report() {
-        // @todo: Will use the schema inspection API as some relayed method calls
-        // to the adapter interface has been removed
-        return [
-            'engine'           => $this->get_driver(),
-            'server_version'   => $this->get_server_version(),
-            'protocol_version' => $this->get_protocol_version(),
-            'host_info'        => $this->get_host_info(),
-            'last_error'       => $this->get_last_error(),
-            'connection_alive' => $this->adapter !== null,
-            'php_extension'    => get_class( $this->adapter ),
-        ];
-    }
-
-    /**
-     * Get a formatted string representation of the database system report.
-     *
-     * Useful for CLI output, error logs, or "Copy to Clipboard" support features.
-     *
-     * @return string The formatted report string.
-     */
-    public function print_system_report() {
-        $report = $this->get_system_report();
-        
-        $output = "### Database System Report" . PHP_EOL . PHP_EOL;
-        $output .= "| Metric | Value |" . PHP_EOL;
-        $output .= "| :--- | :--- |" . PHP_EOL; // Alignment row
-
-        foreach ( $report as $key => $value ) {
-            $label = ucwords( str_replace( '_', ' ', $key ) );
-            if ( is_bool( $value ) ) { $value = $value ? 'Yes' : 'No'; }
-            $value = $value ?? 'N/A';
-
-            $output .= "| **$label** | $value |" . PHP_EOL;
-        }
-
-        return $output;
     }
 
     /**
