@@ -8,12 +8,20 @@
 
 namespace Callismart\DBPrism\Inspection\Contracts;
 
+use Callismart\DBPrism\DatabaseInfoDTO;
+
 /**
  * Contracts for database inspection engines.
  * 
  * Provides an engine-agnostic database schema inspection API.
  */
 interface InspectionInterface {
+
+	/*
+	|--------------------------------------------------------------------------
+	| Database
+	|--------------------------------------------------------------------------
+	*/
 
 	/**
 	 * Retrieve a list of all tables in the current database.
@@ -30,6 +38,13 @@ interface InspectionInterface {
 	 */
 	public function table_exists( string $table ): bool;
 
+
+	/*
+	|--------------------------------------------------------------------------
+	| Columns
+	|--------------------------------------------------------------------------
+	*/
+
 	/**
 	 * Check if a column exists in a table.
 	 *
@@ -38,6 +53,14 @@ interface InspectionInterface {
 	 * @return bool True if the column exists.
 	 */
 	public function column_exists( string $table, string $column ): bool;
+
+	/**
+	 * Get all columns in a table.
+	 *
+	 * @param string $table Table name.
+	 * @return array List of column names.
+	 */
+	public function get_columns( string $table ): array;
 
 	/**
 	 * Get the type of a column.
@@ -49,14 +72,6 @@ interface InspectionInterface {
 	public function get_column_type( string $table, string $column ): ?string;
 
 	/**
-	 * Get all columns in a table.
-	 *
-	 * @param string $table Table name.
-	 * @return array List of column names.
-	 */
-	public function get_columns( string $table ): array;
-
-	/**
 	 * Get detailed column information for a table.
 	 *
 	 * @param string $table Table name.
@@ -65,6 +80,31 @@ interface InspectionInterface {
 	 *               'auto_increment' (if applicable).
 	 */
 	public function get_column_details( string $table ): array;
+
+	/**
+	 * Check if a column is nullable.
+	 *
+	 * @param string $table  Table name.
+	 * @param string $column Column name.
+	 * @return bool|null True if nullable, false if not null, null if column not found.
+	 */
+	public function is_column_nullable( string $table, string $column ): ?bool;
+
+	/**
+	 * Get the default value for a column.
+	 *
+	 * @param string $table  Table name.
+	 * @param string $column Column name.
+	 * @return mixed The default value, or null if none is set or column not found.
+	 */
+	public function get_column_default( string $table, string $column );
+
+
+	/*
+	|--------------------------------------------------------------------------
+	| Indexes
+	|--------------------------------------------------------------------------
+	*/
 
 	/**
 	 * Check if an index exists on the table.
@@ -84,6 +124,13 @@ interface InspectionInterface {
 	 *               and 'unique' (bool).
 	 */
 	public function get_indexes( string $table ): array;
+
+
+	/*
+	|--------------------------------------------------------------------------
+	| Constraints
+	|--------------------------------------------------------------------------
+	*/
 
 	/**
 	 * Get the primary key column(s) for a table.
@@ -131,6 +178,13 @@ interface InspectionInterface {
 	 */
 	public function get_check_constraints( string $table ): array;
 
+
+	/*
+	|--------------------------------------------------------------------------
+	| Table Metadata
+	|--------------------------------------------------------------------------
+	*/
+
 	/**
 	 * Get metadata about a table.
 	 *
@@ -141,23 +195,12 @@ interface InspectionInterface {
 	 */
 	public function get_table_metadata( string $table ): array;
 
-	/**
-	 * Check if a column is nullable.
-	 *
-	 * @param string $table  Table name.
-	 * @param string $column Column name.
-	 * @return bool|null True if nullable, false if not null, null if column not found.
-	 */
-	public function is_column_nullable( string $table, string $column ): ?bool;
 
-	/**
-	 * Get the default value for a column.
-	 *
-	 * @param string $table  Table name.
-	 * @param string $column Column name.
-	 * @return mixed The default value, or null if none is set or column not found.
-	 */
-	public function get_column_default( string $table, string $column );
+	/*
+	|--------------------------------------------------------------------------
+	| Connection & Server
+	|--------------------------------------------------------------------------
+	*/
 
 	/**
 	 * Get information about the connection host.
@@ -186,4 +229,17 @@ interface InspectionInterface {
 	 * @return string Lowercase name of the engine (e.g., "mysql", "pgsql", "sqlite").
 	 */
 	public function get_engine_type(): string;
+
+	/**
+	 * Retrieve information about the active database system and connection.
+	 *
+	 * Information is obtained from the active database connection and engine
+	 * whenever available. Configuration values may be used as fallbacks only
+	 * where equivalent runtime information cannot be determined.
+	 *
+	 * Sensitive authentication credentials are never included.
+	 *
+	 * @return DatabaseInfoDTO Database and connection inspection information.
+	 */
+	public function get_database_info(): DatabaseInfoDTO;
 }

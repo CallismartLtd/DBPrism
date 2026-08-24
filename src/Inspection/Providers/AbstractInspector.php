@@ -9,8 +9,9 @@
 namespace Callismart\DBPrism\Inspection\Providers;
 
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
-use Callismart\DBPrism\Inspection\Contracts\InspectionInterface;
 use Callismart\DBPrism\DBConfigDTO;
+use Callismart\DBPrism\Inspection\Contracts\InspectionInterface;
+use Callismart\DBPrism\DatabaseInfoDTO;
 
 /**
  * Base inspector class with shared logic for all database engines.
@@ -18,53 +19,138 @@ use Callismart\DBPrism\DBConfigDTO;
  * Concrete subclasses must implement engine-specific SQL query methods.
  */
 abstract class AbstractInspector implements InspectionInterface {
+
 	/**
 	 * Constructor.
 	 *
 	 * @param DatabaseAdapterInterface $dbal Database adapter instance.
 	 */
-	public function __construct( 
+	public function __construct(
 		protected DatabaseAdapterInterface $dbal,
 	) {}
 
 	/**
 	 * Execute a raw SQL query and return results via the adapter.
 	 *
-	 * @param string $query SQL query string.
+	 * @param string               $query  SQL query string.
+	 * @param array<string, mixed> $params Query parameters.
+	 *
 	 * @return array Array of result rows.
 	 */
 	protected function execute_query( string $query, array $params = [] ): array {
 		return $this->dbal->get_results( $query, $params );
 	}
 
-    /**
-     * Get the database configuration object.
-     * 
-     * @return DBConfigDTO
-     */
-    public function get_config() : DBConfigDTO {
-        return $this->dbal->get_config();
-    }
+	/**
+	 * Get the database configuration object.
+	 *
+	 * The configuration is supplied by the application and is therefore
+	 * treated as fallback/context information rather than authoritative
+	 * database inspection data.
+	 *
+	 * @return DBConfigDTO
+	 */
+	public function get_config(): DBConfigDTO {
+		return $this->dbal->get_config();
+	}
 
 	/**
 	 * Get the database name.
-	 * 
+	 *
 	 * @return string
 	 */
-	public function db_name() : string {
+	public function db_name(): string {
 		return (string) $this->get_config()->dbname;
 	}
+
+	/*
+	|------------------------------------------
+	| DATABASE INFORMATION
+	|------------------------------------------
+	*/
+
+	/**
+	 * Retrieve comprehensive information about the database and connection.
+	 *
+	 * Values reported directly by the database engine should take precedence
+	 * over values supplied through DBConfigDTO. Configuration values are used
+	 * only where the database cannot provide the corresponding information.
+	 *
+	 * Concrete inspectors may override inspect_database_info() to provide
+	 * engine-specific information.
+	 *
+	 * @return DatabaseInfoDTO
+	 */
+	public function get_database_info(): DatabaseInfoDTO {
+		$config = $this->get_config();
+
+		$info = array(
+			'driver'         => $this->get_engine_type(),
+			'database'       => $this->db_name(),
+			'server_version' => $this->get_server_version(),
+			'protocol'       => $this->get_protocol_version(),
+
+			/*
+			 * These are configuration fallbacks. Concrete inspectors should
+			 * replace them with database-reported values where available.
+			 */
+			'host'            => $config->host,
+			'port'            => $config->port,
+			'charset'         => $config->charset,
+			'collation'       => $config->collation,
+			'socket'          => $config->socket,
+			'path'            => $config->path,
+
+			/*
+			 * Human-readable connection description. Concrete inspectors can
+			 * override this through inspect_database_info().
+			 */
+			'connection'      => $this->get_host_info(),
+		);
+
+		$engine_info = $this->inspect_database_info();
+
+		return new DatabaseInfoDTO(
+			array_merge( $info, $engine_info )
+		);
+	}
+
+	/**
+	 * Retrieve engine-specific database information.
+	 *
+	 * This hook allows concrete inspectors to query their database engine
+	 * directly for information that cannot be obtained generically.
+	 *
+	 * Returned values take precedence over the common information assembled
+	 * by get_database_info().
+	 *
+	 * @return array<string, mixed>
+	 */
+	abstract protected function inspect_database_info(): array;
+
+	/*
+	|------------------------------------------
+	| SCHEMA TYPE NORMALIZATION
+	|------------------------------------------
+	*/
 
 	/**
 	 * Normalize column type string to a canonical form.
 	 *
-	 * Converts database-specific type strings (e.g., "int(11)", "character varying")
-	 * to a normalized form for consistency across engines.
+	 * Converts database-specific type strings (e.g., "int(11)",
+	 * "character varying") to a normalized form for consistency across engines.
 	 *
 	 * @param string $type Raw type from database.
+	 *
 	 * @return string Normalized type.
 	 */
 	abstract protected function normalize_type( string $type ): string;
+
+	/*
+	|------------------------------------------
+	| SCHEMA QUERY DEFINITIONS
+	|------------------------------------------
+	*/
 
 	/**
 	 * Get the SQL query to list all tables.
@@ -77,6 +163,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to check if a table exists.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_table_exists( string $table ): string;
@@ -86,6 +173,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 *
 	 * @param string $table  Table name.
 	 * @param string $column Column name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_column_exists( string $table, string $column ): string;
@@ -94,6 +182,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve column information.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_column_details( string $table ): string;
@@ -102,6 +191,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve indexes.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_indexes( string $table ): string;
@@ -110,6 +200,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve primary key.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_primary_key( string $table ): string;
@@ -118,6 +209,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve foreign keys.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_foreign_keys( string $table ): string;
@@ -126,6 +218,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve unique constraints.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_unique_constraints( string $table ): string;
@@ -134,6 +227,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve check constraints.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_check_constraints( string $table ): string;
@@ -142,9 +236,16 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Get the SQL query to retrieve table metadata.
 	 *
 	 * @param string $table Table name.
+	 *
 	 * @return string SQL query.
 	 */
 	abstract protected function sql_table_metadata( string $table ): string;
+
+	/*
+	|------------------------------------------
+	| TABLE INSPECTION
+	|------------------------------------------
+	*/
 
 	/**
 	 * Implementation of InspectionInterface::get_all_tables()
@@ -165,6 +266,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 */
 	public function table_exists( string $table ): bool {
 		$rows = $this->execute_query( $this->sql_table_exists( $table ) );
+
 		return ! empty( $rows );
 	}
 
@@ -173,6 +275,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 */
 	public function column_exists( string $table, string $column ): bool {
 		$rows = $this->execute_query( $this->sql_column_exists( $table, $column ) );
+
 		return ! empty( $rows );
 	}
 
@@ -214,6 +317,7 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		foreach ( $rows as $row ) {
 			$column_name = $row['column_name'];
+
 			$details[ $column_name ] = array(
 				'type'           => $this->normalize_type( $row['column_type'] ),
 				'nullable'       => (bool) $row['is_nullable'],
@@ -225,6 +329,12 @@ abstract class AbstractInspector implements InspectionInterface {
 		return $details;
 	}
 
+	/*
+	|------------------------------------------
+	| INDEXES AND KEYS
+	|------------------------------------------
+	*/
+
 	/**
 	 * Implementation of InspectionInterface::get_indexes()
 	 */
@@ -234,12 +344,14 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		foreach ( $rows as $row ) {
 			$index_name = $row['index_name'];
+
 			if ( ! isset( $indexes[ $index_name ] ) ) {
 				$indexes[ $index_name ] = array(
 					'columns' => array(),
 					'unique'  => (bool) $row['is_unique'],
 				);
 			}
+
 			$indexes[ $index_name ]['columns'][] = $row['column_name'];
 		}
 
@@ -257,6 +369,7 @@ abstract class AbstractInspector implements InspectionInterface {
 		}
 
 		$columns = array();
+
 		foreach ( $rows as $row ) {
 			$columns[] = $row['column_name'];
 		}
@@ -268,20 +381,25 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_foreign_keys()
 	 */
 	public function get_foreign_keys( string $table ): array {
-		$rows          = $this->execute_query( $this->sql_foreign_keys( $table ) );
-		$foreign_keys  = array();
+		$rows         = $this->execute_query( $this->sql_foreign_keys( $table ) );
+		$foreign_keys = array();
 
 		foreach ( $rows as $row ) {
 			$constraint_name = $row['constraint_name'];
+
 			if ( ! isset( $foreign_keys[ $constraint_name ] ) ) {
 				$foreign_keys[ $constraint_name ] = array(
-					'columns'              => array(),
-					'referenced_table'     => $row['referenced_table'],
-					'referenced_columns'   => array(),
+					'columns'            => array(),
+					'referenced_table'   => $row['referenced_table'],
+					'referenced_columns' => array(),
 				);
 			}
-			$foreign_keys[ $constraint_name ]['columns'][]            = $row['column_name'];
-			$foreign_keys[ $constraint_name ]['referenced_columns'][] = $row['referenced_column'];
+
+			$foreign_keys[ $constraint_name ]['columns'][] =
+				$row['column_name'];
+
+			$foreign_keys[ $constraint_name ]['referenced_columns'][] =
+				$row['referenced_column'];
 		}
 
 		return $foreign_keys;
@@ -292,6 +410,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 */
 	public function has_foreign_key( string $table, string $constraint ): bool {
 		$foreign_keys = $this->get_foreign_keys( $table );
+
 		return isset( $foreign_keys[ $constraint ] );
 	}
 
@@ -304,9 +423,11 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		foreach ( $rows as $row ) {
 			$constraint_name = $row['constraint_name'];
+
 			if ( ! isset( $constraints[ $constraint_name ] ) ) {
 				$constraints[ $constraint_name ] = array();
 			}
+
 			$constraints[ $constraint_name ][] = $row['column_name'];
 		}
 
@@ -322,6 +443,7 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		foreach ( $rows as $row ) {
 			$constraint_name = $row['constraint_name'];
+
 			$constraints[ $constraint_name ] = array(
 				'definition' => $row['definition'],
 			);
@@ -329,6 +451,12 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		return $constraints;
 	}
+
+	/*
+	|------------------------------------------
+	| TABLE METADATA
+	|------------------------------------------
+	*/
 
 	/**
 	 * Implementation of InspectionInterface::get_table_metadata()
@@ -381,33 +509,63 @@ abstract class AbstractInspector implements InspectionInterface {
 		return null;
 	}
 
+	/*
+	|------------------------------------------
+	| CONNECTION INFORMATION
+	|------------------------------------------
+	*/
+
 	/**
-	 * Get connection host info.
+	 * Get connection host information.
+	 *
+	 * Concrete inspectors may override this when the database engine can
+	 * provide more authoritative connection information.
+	 *
+	 * @return string
 	 */
 	public function get_host_info(): string {
-		if ( ! empty( $this->get_config()->socket ) ) {
+		$config = $this->get_config();
+
+		if ( ! empty( $config->socket ) ) {
 			return 'Localhost via UNIX socket';
 		}
 
-		$rawHost = $this->get_config()->host ?? '127.0.0.1';
-		$port    = $this->get_config()->port ?? '3306';
+		$raw_host = $config->host ?? '127.0.0.1';
+		$port     = $config->port ?? '3306';
 
-		// Clean up the host string if it accidentally contains a "host:port" structure
-		if ( str_contains( $rawHost, ':' ) && ! str_starts_with( $rawHost, '[' ) ) {
-			$parsedHost = parse_url( 'http://' . $rawHost, PHP_URL_HOST );
-			$parsedPort = parse_url( 'http://' . $rawHost, PHP_URL_PORT );
-			
-			$host = $parsedHost ?: $rawHost;
-			$port = $parsedPort ?: $port;
+		/*
+		 * Clean up the host string if it accidentally contains a
+		 * host:port structure.
+		 */
+		if (
+			str_contains( $raw_host, ':' ) &&
+			! str_starts_with( $raw_host, '[' )
+		) {
+			$parsed_host = parse_url(
+				'http://' . $raw_host,
+				PHP_URL_HOST
+			);
+
+			$parsed_port = parse_url(
+				'http://' . $raw_host,
+				PHP_URL_PORT
+			);
+
+			$host = $parsed_host ?: $raw_host;
+			$port = $parsed_port ?: $port;
 		} else {
-			$host = $rawHost;
+			$host = $raw_host;
 		}
 
 		if ( strtolower( $host ) === 'localhost' ) {
 			return 'Localhost via UNIX socket';
 		}
 
-		return sprintf( '%s:%s via TCP/IP', $host, $port );
+		return sprintf(
+			'%s:%s via TCP/IP',
+			$host,
+			$port
+		);
 	}
 
 	/**
@@ -416,12 +574,12 @@ abstract class AbstractInspector implements InspectionInterface {
 	abstract public function get_protocol_version();
 
 	/**
-	 * Implementation of InspectionInterface::get_server_version(): string
+	 * Implementation of InspectionInterface::get_server_version()
 	 */
 	abstract public function get_server_version(): string;
 
 	/**
-	 * Implementation of InspectionInterface::get_engine_type(): string
+	 * Implementation of InspectionInterface::get_engine_type()
 	 */
 	abstract public function get_engine_type(): string;
 }

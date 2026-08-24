@@ -328,4 +328,82 @@ class MysqlInspector extends AbstractInspector {
 	public function get_engine_type(): string {
 		return 'mysql';
 	}
+
+	/**
+     * Retrieve MySQL/MariaDB information aligned with DatabaseInfoDTO keys.
+     *
+     * @return array<string, mixed>
+     */
+    protected function inspect_database_info(): array {
+        $row = $this->dbal->get_row(
+            "
+            SELECT
+                DATABASE() AS database_name,
+                VERSION() AS server_version,
+                @@version_comment AS version_comment,
+                @@version_compile_os AS server_os,
+                @@version_compile_machine AS server_architecture,
+                @@hostname AS server_hostname,
+                @@port AS server_port,
+                @@character_set_database AS charset,
+                @@collation_database AS collation,
+                @@time_zone AS timezone,
+                @@lc_time_names AS locale,
+                @@default_storage_engine AS default_engine,
+                @@sql_mode AS sql_mode,
+                @@max_connections AS max_connections,
+                @@wait_timeout AS wait_timeout,
+                @@interactive_timeout AS interactive_timeout,
+                CONNECTION_ID() AS connection_id
+            "
+        );
+
+        if ( ! is_array( $row ) ) {
+            return array();
+        }
+
+        $ssl_status = $this->dbal->get_row( "SHOW SESSION STATUS LIKE 'Ssl_cipher'" );
+        $is_ssl     = is_array( $ssl_status ) && ! empty( $ssl_status['Value'] );
+
+        $version_str = $row['server_version'] ?? '';
+        $is_mariadb  = false !== stripos( $version_str, 'MariaDB' ) 
+                    || false !== stripos( $row['version_comment'] ?? '', 'MariaDB' );
+
+        return array(
+            'engine'              => 'mysql',
+            'product'             => $is_mariadb ? 'MariaDB' : 'MySQL',
+            'version'             => $row['server_version'] ?? null,
+            'protocol_version'    => null,
+            'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+            'server'              => $row['server_hostname'] ?? null,
+            'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
+            'transport'           => null,
+            'socket'              => null,
+            'path'                => null,
+            'ssl'                 => $is_ssl,
+            'charset'             => $row['charset'] ?? null,
+            'collation'           => $row['collation'] ?? null,
+            'timezone'            => $row['timezone'] ?? null,
+            'locale'              => $row['locale'] ?? null,
+            'schema'              => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+            'server_os'           => $row['server_os'] ?? null,
+            'server_architecture' => $row['server_architecture'] ?? null,
+            'server_hostname'     => $row['server_hostname'] ?? null,
+            'capabilities'        => array(
+                'transactions' => true,
+                'foreign_keys' => true,
+                'savepoints'   => true,
+            ),
+            'features'            => array(
+                'default_engine' => $row['default_engine'] ?? null,
+                'sql_mode'       => $row['sql_mode'] ?? null,
+            ),
+            'runtime'             => array(
+                'connection_id'       => isset( $row['connection_id'] ) ? (int) $row['connection_id'] : null,
+                'max_connections'     => isset( $row['max_connections'] ) ? (int) $row['max_connections'] : null,
+                'wait_timeout'        => isset( $row['wait_timeout'] ) ? (int) $row['wait_timeout'] : null,
+                'interactive_timeout' => isset( $row['interactive_timeout'] ) ? (int) $row['interactive_timeout'] : null,
+            ),
+        );
+    }
 }

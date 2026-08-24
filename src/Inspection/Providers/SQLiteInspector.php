@@ -422,4 +422,70 @@ class SQLiteInspector extends AbstractInspector {
 	public function get_engine_type(): string {
 		return 'sqlite';
 	}
+
+	/**
+     * Retrieve SQLite information aligned with DatabaseInfoDTO keys.
+     *
+     * @return array<string, mixed>
+     */
+    protected function inspect_database_info(): array {
+        $version = $this->dbal->get_var( 'SELECT sqlite_version()' );
+
+        if ( null === $version ) {
+            return array();
+        }
+
+        $fetch_pragma = function( string $pragma ): mixed {
+            $row = $this->dbal->get_row( sprintf( 'PRAGMA %s', $pragma ) );
+
+            if ( empty( $row ) ) {
+                return null;
+            }
+
+            return reset( $row );
+        };
+
+        $page_size  = (int) $fetch_pragma( 'page_size' );
+        $page_count = (int) $fetch_pragma( 'page_count' );
+
+        return array(
+            'engine'              => 'sqlite',
+            'product'             => 'SQLite',
+            'version'             => (string) $version,
+            'protocol_version'    => null,
+            'database'            => 'main',
+            'server'              => null,
+            'port'                => null,
+            'transport'           => 'file',
+            'socket'              => null,
+            'path'                => null,
+            'ssl'                 => false,
+            'charset'             => (string) $fetch_pragma( 'encoding' ),
+            'collation'           => 'BINARY',
+            'timezone'            => 'UTC',
+            'locale'              => null,
+            'schema'              => 'main',
+            'server_os'           => PHP_OS,
+            'server_architecture' => null,
+            'server_hostname'     => gethostname() ?: null,
+            'capabilities'        => array(
+                'transactions' => true,
+                'foreign_keys' => (bool) $fetch_pragma( 'foreign_keys' ),
+                'savepoints'   => true,
+            ),
+            'features'            => array(
+                'journal_mode' => strtoupper( (string) $fetch_pragma( 'journal_mode' ) ),
+                'synchronous'  => (int) $fetch_pragma( 'synchronous' ),
+                'auto_vacuum'  => (int) $fetch_pragma( 'auto_vacuum' ),
+            ),
+            'runtime'             => array(
+                'page_size'           => $page_size,
+                'page_count'          => $page_count,
+                'freelist_count'      => (int) $fetch_pragma( 'freelist_count' ),
+                'user_version'        => (int) $fetch_pragma( 'user_version' ),
+                'schema_version'      => (int) $fetch_pragma( 'schema_version' ),
+                'database_size_bytes' => $page_size * $page_count,
+            ),
+        );
+    }
 }

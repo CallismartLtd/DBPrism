@@ -272,4 +272,67 @@ class PostgresInspector extends AbstractInspector {
 	public function get_engine_type(): string {
 		return 'pgsql';
 	}
+
+	/**
+     * Retrieve PostgreSQL information aligned with DatabaseInfoDTO keys.
+     *
+     * @return array<string, mixed>
+     */
+    protected function inspect_database_info(): array {
+        $row = $this->dbal->get_row(
+            "
+            SELECT
+                current_database() AS database_name,
+                current_schema() AS schema_name,
+                current_setting( 'server_version' ) AS server_version,
+                current_setting( 'server_encoding' ) AS charset,
+                current_setting( 'lc_collate' ) AS collation,
+                current_setting( 'TimeZone' ) AS timezone,
+                current_setting( 'lc_messages' ) AS locale,
+                inet_server_addr() AS server_address,
+                inet_server_port() AS server_port,
+                pg_is_in_recovery() AS in_recovery
+            "
+        );
+
+        if ( ! is_array( $row ) ) {
+            return array();
+        }
+
+        $ssl_status = $this->dbal->get_var( "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()" );
+
+        return array(
+            'engine'              => 'pgsql',
+            'product'             => 'PostgreSQL',
+            'version'             => $row['server_version'] ?? null,
+            'protocol_version'    => 3,
+            'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+            'server'              => $row['server_address'] ?? null,
+            'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
+            'transport'           => null,
+            'socket'              => null,
+            'path'                => null,
+            'ssl'                 => null !== $ssl_status ? (bool) $ssl_status : null,
+            'charset'             => $row['charset'] ?? null,
+            'collation'           => $row['collation'] ?? null,
+            'timezone'            => $row['timezone'] ?? null,
+            'locale'              => $row['locale'] ?? null,
+            'schema'              => $row['schema_name'] ?? null,
+            'server_os'           => null,
+            'server_architecture' => null,
+            'server_hostname'     => $row['server_address'] ?? null,
+            'capabilities'        => array(
+                'transactions' => true,
+                'foreign_keys' => true,
+                'savepoints'   => true,
+                'schemas'      => true,
+            ),
+            'features'            => array(
+                'in_recovery' => isset( $row['in_recovery'] ) ? (bool) $row['in_recovery'] : null,
+            ),
+            'runtime'             => array(
+                'backend_pid' => (int) $this->dbal->get_var( "SELECT pg_backend_pid()" ),
+            ),
+        );
+    }
 }
