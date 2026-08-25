@@ -274,65 +274,110 @@ class PostgresInspector extends AbstractInspector {
 	}
 
 	/**
-     * Retrieve PostgreSQL information aligned with DatabaseInfoDTO keys.
-     *
-     * @return array<string, mixed>
-     */
-    protected function inspect_database_info(): array {
-        $row = $this->dbal->get_row(
-            "
-            SELECT
-                current_database() AS database_name,
-                current_schema() AS schema_name,
-                current_setting( 'server_version' ) AS server_version,
-                current_setting( 'server_encoding' ) AS charset,
-                ( SELECT datcollate FROM pg_database WHERE datname = current_database() ) AS collation,
-                current_setting( 'TimeZone' ) AS timezone,
-                current_setting( 'lc_monetary' ) AS locale,
-                inet_server_addr() AS server_address,
-                inet_server_port() AS server_port,
-                pg_is_in_recovery() AS in_recovery
-            "
-        );
+	 * Retrieve PostgreSQL information aligned with DatabaseInfoDTO keys.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function inspect_database_info(): array {
+		try {
+			$row = $this->dbal->get_row(
+				"
+				SELECT
+					version() AS full_version_string,
+					current_database() AS database_name,
+					current_schema() AS schema_name,
+					current_setting( 'server_version' ) AS server_version,
+					current_setting( 'server_encoding' ) AS charset,
+					( SELECT datcollate FROM pg_database WHERE datname = current_database() ) AS collation,
+					current_setting( 'TimeZone' ) AS timezone,
+					current_setting( 'lc_monetary' ) AS locale,
+					inet_server_addr() AS server_address,
+					inet_server_port() AS server_port,
+					pg_is_in_recovery() AS in_recovery,
+					pg_backend_pid() AS backend_pid
+				"
+			);
+		} catch ( \Throwable $e ) {
+			$row = null;
+		}
 
-        if ( ! is_array( $row ) ) {
-            return array();
-        }
+		if ( ! is_array( $row ) ) {
+			try {
+				$row = $this->dbal->get_row(
+					'SELECT version() AS full_version_string, current_database() AS database_name, pg_backend_pid() AS backend_pid'
+				);
+			} catch ( \Throwable $e ) {
+				$row = null;
+			}
+		}
 
-        $ssl_status = $this->dbal->get_var( "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()" );
+		if ( ! is_array( $row ) ) {
+			return array();
+		}
 
-        return array(
-            'engine'              => 'pgsql',
-            'product'             => 'PostgreSQL',
-            'version'             => $row['server_version'] ?? null,
-            'protocol_version'    => 3,
-            'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
-            'server'              => $row['server_address'] ?? null,
-            'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
-            'transport'           => null,
-            'socket'              => null,
-            'path'                => null,
-            'ssl'                 => null !== $ssl_status ? (bool) $ssl_status : null,
-            'charset'             => $row['charset'] ?? null,
-            'collation'           => $row['collation'] ?? null,
-            'timezone'            => $row['timezone'] ?? null,
-            'locale'              => $row['locale'] ?? null,
-            'schema'              => $row['schema_name'] ?? null,
-            'server_os'           => null,
-            'server_architecture' => null,
-            'server_hostname'     => $row['server_address'] ?? null,
-            'capabilities'        => array(
-                'transactions' => true,
-                'foreign_keys' => true,
-                'savepoints'   => true,
-                'schemas'      => true,
-            ),
-            'features'            => array(
-                'in_recovery' => isset( $row['in_recovery'] ) ? (bool) $row['in_recovery'] : null,
-            ),
-            'runtime'             => array(
-                'backend_pid' => (int) $this->dbal->get_var( "SELECT pg_backend_pid()" ),
-            ),
-        );
-    }
+		$full_ver    = (string) ( $row['full_version_string'] ?? '' );
+		$server_os   = null;
+		$server_arch = null;
+
+		if ( preg_match( '/\(([^)]+)\)\s+on\s+([a-zA-Z0-9_\-]+)/i', $full_ver, $matches ) ) {
+			$server_os   = $matches[1] ?? null;
+			$server_arch = $matches[2] ?? null;
+		}
+
+		// inet_server_addr() returns NULL over a Unix socket and an address over
+		// TCP — use that instead of guessing, and reuse the pid we already have
+		// instead of calling pg_backend_pid() a second time.
+		$transport = array_key_exists( 'server_address', $row )
+			? ( ! empty( $row['server_address'] ) ? 'tcp' : 'unix_socket' )
+			: null;
+
+		$ssl = null;
+
+		if ( ! empty( $row['backend_pid'] ) ) {
+			try {
+				$ssl_status = $this->dbal->get_var(
+					sprintf( 'SELECT ssl FROM pg_stat_ssl WHERE pid = %d', (int) $row['backend_pid'] )
+				);
+				$ssl        = null !== $ssl_status ? (bool) $ssl_status : null;
+			} catch ( \Throwable $e ) {
+				// pg_stat_ssl doesn't exist before PostgreSQL 9.5 and may be
+				// restricted by privileges — SSL status is unknown, not absent.
+				$ssl = null;
+			}
+		}
+
+		return array(
+			'engine'              => 'pgsql',
+			'product'             => 'PostgreSQL',
+			'version'             => $row['server_version'] ?? null,
+			'protocol_version'    => 3,
+			'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+			'server'              => $row['server_address'] ?? null,
+			'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
+			'transport'           => $transport,
+			'socket'              => null,
+			'path'                => null,
+			'ssl'                 => $ssl,
+			'charset'             => $row['charset'] ?? null,
+			'collation'           => $row['collation'] ?? null,
+			'timezone'            => $row['timezone'] ?? null,
+			'locale'              => $row['locale'] ?? null,
+			'schema'              => $row['schema_name'] ?? null,
+			'server_os'           => $server_os,
+			'server_architecture' => $server_arch,
+			'server_hostname'     => $row['server_address'] ?? null,
+			'capabilities'        => array(
+				'transactions' => true,
+				'foreign_keys' => true,
+				'savepoints'   => true,
+				'schemas'      => true,
+			),
+			'features'            => array(
+				'in_recovery' => isset( $row['in_recovery'] ) ? (bool) $row['in_recovery'] : null,
+			),
+			'runtime'             => array(
+				'backend_pid' => isset( $row['backend_pid'] ) ? (int) $row['backend_pid'] : null,
+			),
+		);
+	}
 }

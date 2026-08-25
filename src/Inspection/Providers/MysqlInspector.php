@@ -330,87 +330,113 @@ class MysqlInspector extends AbstractInspector {
 	}
 
 	/**
-     * Retrieve MySQL/MariaDB information aligned with DatabaseInfoDTO keys.
-     *
-     * @return array<string, mixed>
-     */
-    protected function inspect_database_info(): array {
-        $row = $this->dbal->get_row(
-            "
-            SELECT
-                DATABASE() AS database_name,
-                VERSION() AS server_version,
-                @@version_comment AS version_comment,
-                @@version_compile_os AS server_os,
-                @@version_compile_machine AS server_architecture,
-                @@hostname AS server_hostname,
-                @@port AS server_port,
-                @@character_set_connection AS charset,
-                @@collation_connection AS collation,
-                @@time_zone AS timezone,
-                @@lc_time_names AS locale,
-                @@default_storage_engine AS default_engine,
-                @@sql_mode AS sql_mode,
-                @@max_connections AS max_connections,
-                @@wait_timeout AS wait_timeout,
-                @@interactive_timeout AS interactive_timeout,
-                CONNECTION_ID() AS connection_id
-            "
-        );
+	 * Retrieve MySQL/MariaDB information aligned with DatabaseInfoDTO keys.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function inspect_database_info(): array {
+		$core_query = "
+			SELECT
+				DATABASE() AS database_name,
+				VERSION() AS server_version,
+				@@version_comment AS version_comment,
+				@@version_compile_os AS server_os,
+				@@version_compile_machine AS server_architecture,
+				@@hostname AS server_hostname,
+				@@port AS server_port,
+				@@character_set_connection AS charset,
+				@@collation_connection AS collation,
+				@@time_zone AS timezone,
+				@@lc_time_names AS locale,
+				@@default_storage_engine AS default_engine,
+				@@sql_mode AS sql_mode,
+				@@max_connections AS max_connections,
+				@@wait_timeout AS wait_timeout,
+				@@interactive_timeout AS interactive_timeout,
+				CONNECTION_ID() AS connection_id
+			";
 
-        if ( ! is_array( $row ) ) {
-            return array();
-        }
+		try {
+			$row = $this->dbal->get_row( $core_query );
+		} catch ( \Throwable $e ) {
+			$row = null;
+		}
 
-        $ssl_status = $this->dbal->get_row( "SHOW SESSION STATUS LIKE 'Ssl_cipher'" );
-        $cipher_val = '';
+		// Some session variables above are restricted on managed MySQL (e.g. RDS)
+		// or absent on certain forks. If the full query failed, fall back to the
+		// minimum needed to identify the engine rather than returning nothing.
+		if ( ! is_array( $row ) ) {
+			try {
+				$row = $this->dbal->get_row(
+					'SELECT DATABASE() AS database_name, VERSION() AS server_version, CONNECTION_ID() AS connection_id'
+				);
+			} catch ( \Throwable $e ) {
+				$row = null;
+			}
+		}
 
-        if ( is_array( $ssl_status ) ) {
-            $cipher_val = $ssl_status['Value'] ?? $ssl_status['value'] ?? '';
-        }
+		if ( ! is_array( $row ) ) {
+			return array();
+		}
 
-        $is_ssl      = ! empty( $cipher_val ) && 'NONE' !== strtoupper( (string) $cipher_val );
-        $version_str = (string) ( $row['server_version'] ?? '' );
-        $comment_str = (string) ( $row['version_comment'] ?? '' );
+		try {
+			$ssl_status = $this->dbal->get_row( "SHOW SESSION STATUS LIKE 'Ssl_cipher'" );
+			$cipher_val = is_array( $ssl_status ) ? ( $ssl_status['Value'] ?? $ssl_status['value'] ?? '' ) : '';
+			$is_ssl     = ! empty( $cipher_val ) && 'NONE' !== strtoupper( (string) $cipher_val );
+		} catch ( \Throwable $e ) {
+			// A failed status query means "unknown", not "confirmed no SSL".
+			$is_ssl = null;
+		}
 
-        $is_mariadb  = false !== stripos( $version_str, 'MariaDB' ) 
-                    || false !== stripos( $comment_str, 'MariaDB' );
+		$version_str = (string) ( $row['server_version'] ?? '' );
+		$comment_str = (string) ( $row['version_comment'] ?? '' );
 
-        return array(
-            'engine'              => 'mysql',
-            'product'             => $is_mariadb ? 'MariaDB' : 'MySQL',
-            'version'             => $row['server_version'] ?? null,
-            'protocol_version'    => null,
-            'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
-            'server'              => $row['server_hostname'] ?? null,
-            'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
-            'transport'           => null,
-            'socket'              => null,
-            'path'                => null,
-            'ssl'                 => $is_ssl,
-            'charset'             => $row['charset'] ?? null,
-            'collation'           => $row['collation'] ?? null,
-            'timezone'            => $row['timezone'] ?? null,
-            'locale'              => $row['locale'] ?? null,
-            'schema'              => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
-            'server_os'           => $row['server_os'] ?? null,
-            'server_architecture' => $row['server_architecture'] ?? null,
-            'server_hostname'     => $row['server_hostname'] ?? null,
-            'capabilities'        => array(
-                'transactions' => true,
-                'foreign_keys' => true,
-                'savepoints'   => true,
-            ),
-            'features'            => array(
-                'default_engine' => $row['default_engine'] ?? null,
-                'sql_mode'       => $row['sql_mode'] ?? null,
-            ),
-            'runtime'             => array(
-                'connection_id'       => isset( $row['connection_id'] ) ? (int) $row['connection_id'] : null,
-                'max_connections'     => isset( $row['max_connections'] ) ? (int) $row['max_connections'] : null,
-                'wait_timeout'        => isset( $row['wait_timeout'] ) ? (int) $row['wait_timeout'] : null,
-                'interactive_timeout' => isset( $row['interactive_timeout'] ) ? (int) $row['interactive_timeout'] : null,
-            ),
-        );
-    }
+		$is_mariadb = false !== stripos( $version_str, 'MariaDB' )
+					|| false !== stripos( $comment_str, 'MariaDB' );
+
+		// Transaction/FK/savepoint support depends on the storage engine, not
+		// MySQL/MariaDB itself. This reflects only the *default* engine — a
+		// database can still mix engines per table.
+		$default_engine = strtolower( (string) ( $row['default_engine'] ?? '' ) );
+		$transactional  = in_array( $default_engine, array( 'innodb', 'ndbcluster', 'ndb', 'rocksdb', 'tokudb' ), true );
+
+		$hostname = ! empty( $row['server_hostname'] ) ? (string) $row['server_hostname'] : null;
+
+		return array(
+			'engine'              => 'mysql',
+			'product'             => $is_mariadb ? 'MariaDB' : 'MySQL',
+			'version'             => $row['server_version'] ?? null,
+			'protocol_version'    => null,
+			'database'            => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+			'server'              => $hostname,
+			'port'                => isset( $row['server_port'] ) ? (int) $row['server_port'] : null,
+			'transport'           => null,
+			'socket'              => null,
+			'path'                => null,
+			'ssl'                 => $is_ssl,
+			'charset'             => $row['charset'] ?? null,
+			'collation'           => $row['collation'] ?? null,
+			'timezone'            => $row['timezone'] ?? null,
+			'locale'              => $row['locale'] ?? null,
+			'schema'              => ! empty( $row['database_name'] ) ? $row['database_name'] : null,
+			'server_os'           => $row['server_os'] ?? null,
+			'server_architecture' => $row['server_architecture'] ?? null,
+			'server_hostname'     => $hostname,
+			'capabilities'        => array(
+				'transactions' => $transactional,
+				'foreign_keys' => $transactional,
+				'savepoints'   => $transactional,
+			),
+			'features'            => array(
+				'default_engine' => $row['default_engine'] ?? null,
+				'sql_mode'       => $row['sql_mode'] ?? null,
+			),
+			'runtime'             => array(
+				'connection_id'       => isset( $row['connection_id'] ) ? (int) $row['connection_id'] : null,
+				'max_connections'     => isset( $row['max_connections'] ) ? (int) $row['max_connections'] : null,
+				'wait_timeout'        => isset( $row['wait_timeout'] ) ? (int) $row['wait_timeout'] : null,
+				'interactive_timeout' => isset( $row['interactive_timeout'] ) ? (int) $row['interactive_timeout'] : null,
+			),
+		);
+	}
 }

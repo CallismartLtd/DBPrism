@@ -424,73 +424,92 @@ class SQLiteInspector extends AbstractInspector {
 	}
 
 	/**
-     * Retrieve SQLite information aligned with DatabaseInfoDTO keys.
-     *
-     * @return array<string, mixed>
-     */
-    protected function inspect_database_info(): array {
-        $version = $this->dbal->get_var( 'SELECT sqlite_version()' );
+	 * Retrieve SQLite information aligned with DatabaseInfoDTO keys.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function inspect_database_info(): array {
+		try {
+			$version = $this->dbal->get_var( 'SELECT sqlite_version()' );
+		} catch ( \Throwable $e ) {
+			return array();
+		}
 
-        if ( null === $version || '' === $version ) {
-            return array();
-        }
+		if ( null === $version || '' === $version ) {
+			return array();
+		}
 
-        $fetch_pragma = function( string $pragma ): mixed {
-            // Strip anything that isn't a safe pragma identifier
-            $clean_pragma = preg_replace( '/[^a-zA-Z0-9_]/', '', $pragma );
-            $row          = $this->dbal->get_row( sprintf( 'PRAGMA %s', $clean_pragma ) );
+		$fetch_pragma = function ( string $pragma ): mixed {
+			// Strip anything that isn't a safe pragma identifier.
+			$clean_pragma = preg_replace( '/[^a-zA-Z0-9_]/', '', $pragma );
 
-            if ( ! is_array( $row ) || empty( $row ) ) {
-                return null;
-            }
+			try {
+				$row = $this->dbal->get_row( sprintf( 'PRAGMA %s', $clean_pragma ) );
+			} catch ( \Throwable $e ) {
+				return null;
+			}
 
-            // Always fetch the first column value safely regardless of array keys
-            $values = array_values( $row );
-            return $values[0] ?? null;
-        };
+			if ( ! is_array( $row ) || empty( $row ) ) {
+				return null;
+			}
 
-        $page_size  = (int) $fetch_pragma( 'page_size' );
-        $page_count = (int) $fetch_pragma( 'page_count' );
-        $hostname   = @gethostname();
+			// Fetch the first column value safely regardless of array keys.
+			$values = array_values( $row );
+			return $values[0] ?? null;
+		};
 
-        return array(
-            'engine'              => 'sqlite',
-            'product'             => 'SQLite',
-            'version'             => (string) $version,
-            'protocol_version'    => null,
-            'database'            => 'main',
-            'server'              => null,
-            'port'                => null,
-            'transport'           => 'file',
-            'socket'              => null,
-            'path'                => null,
-            'ssl'                 => false,
-            'charset'             => (string) ( $fetch_pragma( 'encoding' ) ?? 'UTF-8' ),
-            'collation'           => 'BINARY',
-            'timezone'            => 'UTC',
-            'locale'              => null,
-            'schema'              => 'main',
-            'server_os'           => PHP_OS_FAMILY,
-            'server_architecture' => null,
-            'server_hostname'     => false !== $hostname ? $hostname : null,
-            'capabilities'        => array(
-                'transactions' => true,
-                'foreign_keys' => (bool) $fetch_pragma( 'foreign_keys' ),
-                'savepoints'   => true,
-            ),
-            'features'            => array(
-                'journal_mode' => strtoupper( (string) $fetch_pragma( 'journal_mode' ) ),
-                'synchronous'  => (int) $fetch_pragma( 'synchronous' ),
-                'auto_vacuum'  => (int) $fetch_pragma( 'auto_vacuum' ),
-            ),
-            'runtime'             => array(
-                'page_size'           => $page_size,
-                'page_count'          => $page_count,
-                'freelist_count'      => (int) $fetch_pragma( 'freelist_count' ),
-                'user_version'        => (int) $fetch_pragma( 'user_version' ),
-                'schema_version'      => (int) $fetch_pragma( 'schema_version' ),
-                'database_size_bytes' => $page_size * $page_count,
-            ),
-        );
-    }
+		$page_size_raw      = $fetch_pragma( 'page_size' );
+		$page_count_raw     = $fetch_pragma( 'page_count' );
+		$foreign_keys_raw   = $fetch_pragma( 'foreign_keys' );
+		$journal_mode_raw   = $fetch_pragma( 'journal_mode' );
+		$synchronous_raw    = $fetch_pragma( 'synchronous' );
+		$auto_vacuum_raw    = $fetch_pragma( 'auto_vacuum' );
+		$freelist_raw       = $fetch_pragma( 'freelist_count' );
+		$user_version_raw   = $fetch_pragma( 'user_version' );
+		$schema_version_raw = $fetch_pragma( 'schema_version' );
+
+		$page_size  = null !== $page_size_raw ? (int) $page_size_raw : null;
+		$page_count = null !== $page_count_raw ? (int) $page_count_raw : null;
+		$hostname   = function_exists( 'gethostname' ) ? gethostname() : false;
+
+		return array(
+			'engine'              => 'sqlite',
+			'product'             => 'SQLite',
+			'version'             => (string) $version,
+			'protocol_version'    => null,
+			'database'            => 'main',
+			'server'              => null,
+			'port'                => null,
+			'transport'           => 'file',
+			'socket'              => null,
+			'path'                => null,
+			'ssl'                 => false,
+			'charset'             => (string) ( $fetch_pragma( 'encoding' ) ?? 'UTF-8' ),
+			'collation'           => 'BINARY',
+			'timezone'            => 'UTC',
+			'locale'              => null,
+			'schema'              => 'main',
+			'server_os'           => PHP_OS_FAMILY,
+			'server_architecture' => null,
+			'server_hostname'     => false !== $hostname ? $hostname : null,
+			'capabilities'        => array(
+				'transactions' => true,
+				'foreign_keys' => null !== $foreign_keys_raw ? (bool) $foreign_keys_raw : null,
+				'savepoints'   => true,
+			),
+			'features'            => array(
+				'journal_mode' => null !== $journal_mode_raw ? strtoupper( (string) $journal_mode_raw ) : null,
+				'synchronous'  => null !== $synchronous_raw ? (int) $synchronous_raw : null,
+				'auto_vacuum'  => null !== $auto_vacuum_raw ? (int) $auto_vacuum_raw : null,
+			),
+			'runtime'             => array(
+				'page_size'           => $page_size,
+				'page_count'          => $page_count,
+				'freelist_count'      => null !== $freelist_raw ? (int) $freelist_raw : null,
+				'user_version'        => null !== $user_version_raw ? (int) $user_version_raw : null,
+				'schema_version'      => null !== $schema_version_raw ? (int) $schema_version_raw : null,
+				'database_size_bytes' => ( null !== $page_size && null !== $page_count ) ? $page_size * $page_count : null,
+			),
+		);
+	}
 }
