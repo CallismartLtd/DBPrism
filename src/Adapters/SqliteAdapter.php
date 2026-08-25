@@ -79,8 +79,9 @@ class SqliteAdapter implements DatabaseAdapterInterface {
 
             $filename   = $this->build_sqlite_path();
 
-            $flags      = $this->config->flags ?? ( SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE );
-            $encryption = $this->config->encryption_key ?? '';
+
+            $flags      = ! empty( $this->config->flags ) ? $this->config->flags : ( SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE );
+            $encryption = ! empty( $this->config->encryption_key ) ? $this->config->encryption_key : '';
 
             $this->sqlite = new SQLite3( $filename, (int) $flags, $encryption );
             $this->sqlite->busyTimeout( 5000 );
