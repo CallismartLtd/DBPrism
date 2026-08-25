@@ -22,7 +22,7 @@ use Callismart\DBPrism\Inspection\Providers\SQLiteInspector;
  * This facade exposes an engine-agnostic API for database, connection, and schema
  * introspection across supported database drivers such as MySQL, PostgreSQL, and SQLite.
  *
- * @method static DatabaseInfoDTO get_database_info()
+ * @method static \Callismart\DBPrism\DatabaseInfoDTO get_database_info()
  *     Retrieve comprehensive database engine, server, connection, and runtime
  *     information. Values reported directly by the database engine take precedence
  *     over configuration values supplied through DBConfigDTO.
