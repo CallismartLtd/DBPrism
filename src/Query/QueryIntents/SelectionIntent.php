@@ -131,19 +131,19 @@ class SelectionIntent implements QueryIntentInterface{
             foreach ( $case_expression->get_branches() as $branch ) {
                 // Pull bindings generated inside the WHEN condition branch sandbox.
                 foreach ( $branch['criteria']->get_bindings() as $condition_binding ) {
-                    $this->bindings[] = $condition_binding;
+                    $this->select_bindings[] = $condition_binding;
                 }
 
                 // Pull the output THEN value if it is an executable parameter.
                 if ( ! is_object( $branch['then_value'] ) ) {
-                    $this->bindings[] = $branch['then_value'];
+                    $this->select_bindings[] = $branch['then_value'];
                 }
             }
 
             // Pull the final fallback ELSE binding if present.
             $else_value = $case_expression->get_else();
             if ( null !== $else_value && ! is_object( $else_value ) ) {
-                $this->bindings[] = $else_value;
+                $this->select_bindings[] = $else_value;
             }
         }
 
@@ -336,11 +336,6 @@ class SelectionIntent implements QueryIntentInterface{
      * @return bool
      */
     protected function should_bind_value( mixed $value ) : bool {
-        // If it's a string expression or function call, bypass parameterization
-        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
-            return false;
-        }
-        
-        return true;
+        return ! ( $value instanceof DefaultColumnValue );
     }
 }

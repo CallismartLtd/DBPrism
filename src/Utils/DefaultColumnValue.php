@@ -48,7 +48,7 @@ class DefaultColumnValue {
 		if ( $value instanceof self ) {
 			return $value;
 		}
-		return new self( $value, $is_expression );
+		return new static( $value, $is_expression );
 	}
 
 	/**

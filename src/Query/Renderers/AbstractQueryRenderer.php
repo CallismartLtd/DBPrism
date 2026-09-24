@@ -799,7 +799,7 @@ abstract class AbstractQueryRenderer {
                 return $this->parse_agnostic_expression( (string) $identifier );
             }
 
-            return $identifier;
+            return (string) $identifier;
         }
 
         $identifier = trim( $identifier );
@@ -894,6 +894,6 @@ abstract class AbstractQueryRenderer {
         return preg_replace_callback('/\[([^\]]+)\]/', function ( array $matches ) {
             // $matches[1] isolates the identifier element wrapped inside the brackets
             return $this->quote_identifier( $matches[1] );
-        }, $expression);
+        }, $expression );
     }
 }

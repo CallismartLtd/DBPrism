@@ -7,6 +7,8 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Tests\Query\Intent;
 
+use Callismart\DBPrism\Utils\DefaultColumnValue;
+use Callismart\DBPrism\Utils\SQLExpression;
 use PHPUnit\Framework\TestCase;
 use function Callismart\DBPrism\tests\queryBuilder;
 use function Callismart\DBPrism\tests\dbal;
@@ -310,8 +312,8 @@ final class SelectionIntentTest extends TestCase {
             ->select( '*' )
             ->from( 'calldbal_licenses' )
             ->where( 'status', '=', 'active' )
-            ->where( 'expires_at', '>', 'NOW()' )         // Expression: Skip binding
-            ->where( 'seats', '>', 'SUM(legacy_seats)' )  // Expression: Skip binding
+            ->where( 'expires_at', '>', SQLExpression::currentTime() ) // Expression: Skip binding
+            ->where( 'seats', '>', SQLExpression::sum( 'legacy_seats' ) )  // Expression: Skip binding
             ->where( 'tier_id', '=', 5 );
 
         $this->assertSame(
@@ -329,7 +331,7 @@ final class SelectionIntentTest extends TestCase {
         $query = queryBuilder()
             ->select( '*' )
             ->from( 'wp_users' )
-            ->where_in( 'region', [ 'North', 'LOWER(fallback_field)', 'South' ] );
+            ->where_in( 'region', [ 'North', SQLExpression::lower( 'fallback_field' ), 'South' ] );
 
         $this->assertSame(
             [ 'North', 'South' ],
@@ -370,9 +372,9 @@ final class SelectionIntentTest extends TestCase {
             ->select( '*' )
             ->from( 'calldbal_licenses' )
             ->where( 'is_active', '=', 1 )
-            ->where( 'created_at', '<', 'NOW()' ) // Expression bypass
+            ->where( 'created_at', '<', SQLExpression::func( 'NOW' ) ) // Expression bypass
             ->where_group( function( $q ) {
-                $q->where_in( 'type', [ 'pro', 'LOWER(custom_type)', 'enterprise' ] ) // 1 Expression
+                $q->where_in( 'type', [ 'pro', SQLExpression::lower( 'custom_type' ), 'enterprise' ] ) // 1 Expression
                   ->or_where_in_subquery( 'owner_id', function( $subquery ) {
                       $subquery->select( 'id' )
                           ->from( 'wp_users' )
