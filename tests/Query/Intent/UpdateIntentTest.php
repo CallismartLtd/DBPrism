@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 namespace Callismart\DBPrism\Tests\Query\Intent;
 
+use Callismart\DBPrism\Utils\SQLExpression;
 use PHPUnit\Framework\TestCase;
 use function Callismart\DBPrism\tests\queryBuilder;
 use function Callismart\DBPrism\tests\dbal;
@@ -187,8 +188,8 @@ final class UpdateIntentTest extends TestCase {
             ->update('smwoo_licenses')
             ->set([
                 'status'     => 'expired',
-                'updated_at' => 'NOW()',            // Expression: Should NOT bind!
-                'score'      => 'COALESCE(score, 0)' // Expression: Should NOT bind!
+                'updated_at' => SQLExpression::currentTimestamp(), // Expression: Should NOT bind!
+                'score'      => SQLExpression::coalesce( 'score', 0 ) // Expression: Should NOT bind!
             ])
             ->where('id', '=', 10);
 
@@ -203,8 +204,8 @@ final class UpdateIntentTest extends TestCase {
 
         // 2. State dictionary metadata payload must remain unmutated for the compiler
         $data = $query->get_data();
-        $this->assertSame('NOW()', $data['updated_at']);
-        $this->assertSame('COALESCE(score, 0)', $data['score']);
+        $this->assertSame( 'CURRENT_TIMESTAMP', (string) $data['updated_at'] );
+        $this->assertSame( 'COALESCE(score, 0)', (string) $data['score'] );
     }
 
     /**
@@ -216,7 +217,7 @@ final class UpdateIntentTest extends TestCase {
         $query = queryBuilder()
             ->update('smwoo_licenses')
             ->set_case('quota_tier', function ($case) {
-                $case->when(fn($q) => $q->where('manager_tier', '=', 'Senior'), 'COUNT(id)') // Expression branch
+                $case->when(fn($q) => $q->where('manager_tier', '=', 'Senior'), SQLExpression::func( 'COUNT', ['id'] ) ) // Expression branch
                      ->else(50);
             })
             ->where('status', '=', 'active');
@@ -242,16 +243,16 @@ final class UpdateIntentTest extends TestCase {
             ->update('smwoo_licenses')
             ->set([
                 'status'     => 'provisioned',
-                'updated_at' => 'NOW()' // Expression bypass
+                'updated_at' => SQLExpression::func( 'NOW' ) // Expression bypass
             ])
             ->set_case('priority_index', function ($case) {
                 $case->when(fn($q) => $q->where('tier_level', '=', 'Platinum'), 99)
-                     ->else('LOWER(default_index)'); // Expression bypass
+                     ->else( SQLExpression::lower( 'default_index' ) ); // Expression bypass
             })
             ->where_in_subquery('owner_id', function ($subquery) {
-                $subquery->select('id')
-                         ->from('wp_users')
-                         ->where('role', '=', 'administrator');
+                $subquery->select( 'id' )
+                ->from( 'users' )
+                ->where( 'role', '=', 'administrator' );
             });
 
         // Verifying chronological binding extraction remains absolutely synchronous

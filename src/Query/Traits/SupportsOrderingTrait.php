@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace Callismart\DBPrism\Query\Traits;
 
 use Callismart\DBPrism\Utils\CaseExpression;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
 
 /**
  * Provides fluent methods for managing SQL ORDER BY clauses.
@@ -105,11 +106,6 @@ trait SupportsOrderingTrait {
      * @return bool
      */
     protected function should_bind_value( mixed $value ) : bool {
-        // If it's a string expression or function call, bypass parameterization
-        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
-            return false;
-        }
-        
-        return true;
+        return ! ( $value instanceof DefaultColumnValue );
     }
 }

@@ -8,6 +8,8 @@ use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\SQLBuilder;
 use PHPUnit\Framework\TestCase;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
+use Callismart\DBPrism\Utils\SQLExpression;
 
 use function Callismart\DBPrism\tests\queryBuilder;
 
@@ -257,8 +259,8 @@ class QueryCriteriaTest extends TestCase {
      */
     public function test_where_clause_intercepts_and_filters_sql_expressions() : void {
         $this->criteria->where( 'status', '=', 'active' )
-                       ->where( 'updated_at', '>', 'NOW()' )         // Expression: Block parameter
-                       ->where( 'score', '<', 'AVG(total_score)' )    // Expression: Block parameter
+                       ->where( 'updated_at', '>', SQLExpression::func( 'Now' ) ) // Expression: Block parameter
+                       ->where( 'score', '<', SQLExpression::avg( DefaultColumnValue::make( 'total_score' ) ) ) // Expression: Block parameter
                        ->where( 'limit_bound', '=', 25 );
 
         $conditions = $this->criteria->get_conditions();
@@ -268,8 +270,8 @@ class QueryCriteriaTest extends TestCase {
         $this->assertSame( ['active', 25], $bindings );
 
         $this->assertSame( 'Basic', $conditions[1]['type'] );
-        $this->assertSame( 'NOW()', $conditions[1]['value'] );
-        $this->assertSame( 'AVG(total_score)', $conditions[2]['value'] );
+        $this->assertSame( 'NOW()', (string) $conditions[1]['value'] );
+        $this->assertSame( 'AVG(total_score)', (string) $conditions[2]['value'] );
     }
 
     /**
@@ -277,14 +279,15 @@ class QueryCriteriaTest extends TestCase {
      * while accurately preserving standard scalar configurations.
      */
     public function test_where_in_filters_expressions_within_value_arrays() : void {
-        $this->criteria->where_in( 'region', ['North', 'LOWER(fallback_field)', 'South'] );
+        $this->criteria->where_in( 'region', ['North', SQLExpression::lower( 'fallback_field' ), 'South'] );
 
         $conditions = $this->criteria->get_conditions();
         $bindings   = $this->get_flat_bindings( $this->criteria->get_bindings() );
+        $values     = array_map( fn ( $value ) => (string) $value, $conditions[0]['values'] );
 
         $this->assertCount( 1, $conditions );
         $this->assertSame( ['North', 'South'], $bindings );
-        $this->assertSame( ['North', 'LOWER(fallback_field)', 'South'], $conditions[0]['values'] );
+        $this->assertSame( ['North', 'LOWER(fallback_field)', 'South'], $values );
     }
 
     /**
@@ -331,10 +334,10 @@ class QueryCriteriaTest extends TestCase {
      * 'expression_value' metadata properties instead of polluting standard string bindings.
      */
     public function test_where_like_expression_interception_metadata_registration() : void {
+        
         $this->expectException( \InvalidArgumentException::class );
-        $this->expectExceptionMessage( 'LIKE value must be a scalar parameter.' );
-
-        $this->criteria->where_like( 'computed_hash', 'SUM(amount)' );
+        
+        $this->criteria->where_like( 'computed_hash', SQLExpression::sum( 'amount' ) );
     }
 
     /**

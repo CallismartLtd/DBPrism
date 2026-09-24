@@ -17,6 +17,7 @@ use InvalidArgumentException;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Utils\CaseExpression;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
 
 /**
  * Represents an intent to persist or modify data (INSERT/UPDATE).
@@ -253,12 +254,7 @@ class PersistenceIntent implements QueryIntentInterface {
      * @return bool
      */
     protected function should_bind_value( mixed $value ) : bool {
-        // If it's a string expression or function call, bypass parameterization
-        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
-            return false;
-        }
-        
-        return true;
+        return ! ( $value instanceof DefaultColumnValue );
     }
 
     /**

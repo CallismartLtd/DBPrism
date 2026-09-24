@@ -19,18 +19,28 @@ class SQLExpression extends DefaultColumnValue {
      * Create a generic SQL function call with optional arguments.
      * All arguments are string-cast as raw tokens without internal quoting.
      *
-     * @param string $function_name The name of the SQL function.
+     * @param string $function_name The name or signature of the SQL function.
      * @param array  $args          The positional arguments for the function call.
      * @return static
      */
     public static function func( string $function_name, array $args = [] ): static {
+        $trimmed_name = trim( $function_name );
+
+        // If the string already contains parentheses and no extra $args are passed, return as raw expression.
+        if ( empty( $args ) && str_contains( $trimmed_name, '(' ) && str_ends_with( $trimmed_name, ')' ) ) {
+            return static::expression( $trimmed_name );
+        }
+
+        // Clean trailing parentheses to avoid double-bracket output like FUNCTION_NAME()()
+        $clean_name = rtrim( $trimmed_name, '()' );
+
         if ( empty( $args ) ) {
-            return static::expression( strtoupper( $function_name ) . '()' );
+            return static::expression( strtoupper( $clean_name ) . '()' );
         }
 
         $tokens = array_map( static fn( mixed $arg ) => (string) $arg, $args );
 
-        return static::expression( sprintf( '%s(%s)', strtoupper( $function_name ), implode( ', ', $tokens ) ) );
+        return static::expression( sprintf( '%s(%s)', strtoupper( $clean_name ), implode( ', ', $tokens ) ) );
     }
 
     /* -----------------------------------------------------------------

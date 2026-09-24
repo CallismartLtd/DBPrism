@@ -7,6 +7,7 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Tests\Query\Intent;
 
+use Callismart\DBPrism\Utils\SQLExpression;
 use PHPUnit\Framework\TestCase;
 use function Callismart\DBPrism\tests\{
     queryBuilder,
@@ -163,8 +164,8 @@ final class DeleteIntentTest extends TestCase {
         $query = queryBuilder()
             ->delete( 'smwoo_licenses' )
             ->where( 'status', '=', 'expired' )
-            ->where( 'expires_at', '<', 'NOW()' )         // Expression: Skip binding
-            ->where( 'quota', '<', 'AVG(fallback_quota)' ) // Expression: Skip binding
+            ->where( 'expires_at', '<', SQLExpression::func( 'NOW' ) ) // Expression: Skip binding
+            ->where( 'quota', '<', SQLExpression::avg( 'fallback_quota' ) ) // Expression: Skip binding
             ->where( 'force_purge', '=', 1 );
 
         $this->assertSame(

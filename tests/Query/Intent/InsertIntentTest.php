@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 namespace Callismart\DBPrism\Tests\Query\Intent;
 
+use Callismart\DBPrism\Utils\SQLExpression;
 use PHPUnit\Framework\TestCase;
 use function Callismart\DBPrism\tests\queryBuilder;
 
@@ -148,7 +149,7 @@ final class InsertIntentTest extends TestCase {
             ->values([
                 'license_key' => 'SMW-123-ABC',
                 'status'      => 'active',
-                'created_at'  => 'NOW()' // Expression: Should NOT bind!
+                'created_at'  => SQLExpression::func( 'now' ) // Expression: Should NOT bind!
             ]);
 
         // 1. Parameter tracking array should strictly skip the expression string
@@ -165,9 +166,9 @@ final class InsertIntentTest extends TestCase {
             [
                 'license_key' => 'SMW-123-ABC',
                 'status'      => 'active',
-                'created_at'  => 'NOW()'
+                'created_at'  => (string) SQLExpression::func( 'NOW' ) // Rebuild with uppercase
             ],
-            $query->get_data()
+            \array_map( fn ($value ) => (string) $value, $query->get_data())
         );
     }
 
@@ -182,11 +183,11 @@ final class InsertIntentTest extends TestCase {
             ->multi_values([
                 [
                     'license_key' => 'KEY-1',
-                    'created_at'  => 'NOW()' // Expression: Skip
+                    'created_at'  => SQLExpression::currentTime() // Expression: Skip
                 ],
                 [
                     'license_key' => 'KEY-2',
-                    'created_at'  => 'LOWER(field)' // Expression: Skip
+                    'created_at'  => SQLExpression::lower( 'field' ) // Expression: Skip
                 ]
             ]);
 

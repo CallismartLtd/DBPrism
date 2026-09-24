@@ -11,6 +11,7 @@ namespace Callismart\DBPrism\Query\Traits;
 
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Utils\DefaultColumnValue;
 use LogicException;
 
 /**
@@ -398,13 +399,13 @@ trait QueryCriteriaTrait {
     /**
      * Add a basic WHERE LIKE clause with automatic value escaping.
      * @param string $column   The target column.
-     * @param string $value    The search pattern (e.g., '%term%').
+     * @param string|DefaultColumnValue $value    The search pattern (e.g., '%term%').
      * @param string $boolean  Logical connector (AND / OR).
      * @param bool   $not      Whether to negate (NOT LIKE).
      * @param bool   $is_pre_escaped Internal flag to skip double-escaping from helpers.
      * @return static
      */
-    public function where_like( string $column, string $value, string $boolean = 'AND', bool $not = false, bool $is_pre_escaped = false ) : static {
+    public function where_like( string $column, string|DefaultColumnValue $value, string $boolean = 'AND', bool $not = false, bool $is_pre_escaped = false ) : static {
         if ( ! $this->should_bind_value( $value ) ) {
             throw new \InvalidArgumentException( 'LIKE value must be a scalar parameter.' );
         }
@@ -693,11 +694,6 @@ trait QueryCriteriaTrait {
      * @return bool
      */
     protected function should_bind_value( mixed $value ) : bool {
-        // If it's a string expression or function call, bypass parameterization
-        if ( is_string( $value ) && static::is_sql_expression( $value ) ) {
-            return false;
-        }
-        
-        return true;
+        return ! ( $value instanceof DefaultColumnValue );
     }
 }
