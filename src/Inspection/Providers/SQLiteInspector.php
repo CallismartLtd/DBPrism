@@ -512,4 +512,30 @@ class SQLiteInspector extends AbstractInspector {
 			),
 		);
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * SQLite has no server-side size function — the database's own
+	 * page_size * page_count pragma pair is the standard way to compute
+	 * its size, and matches exactly what inspect_database_info() already
+	 * reports under runtime.database_size_bytes, so the two never
+	 * disagree. For an in-memory database, size is reported as 0 rather
+	 * than null — it genuinely has a small, real in-memory footprint,
+	 * not an undeterminable one.
+	 */
+	public function get_database_size(): ?int {
+		try {
+			$page_size  = $this->dbal->get_var( 'PRAGMA page_size' );
+			$page_count = $this->dbal->get_var( 'PRAGMA page_count' );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		if ( null === $page_size || null === $page_count ) {
+			return null;
+		}
+
+		return (int) $page_size * (int) $page_count;
+	}
 }

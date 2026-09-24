@@ -231,6 +231,21 @@ interface InspectionInterface {
 	public function get_engine_type(): string;
 
 	/**
+	 * Get the total size of the current database, in bytes.
+	 *
+	 * Engines report this differently — MySQL/PostgreSQL via a system
+	 * query (information_schema / pg_database_size()), SQLite via the
+	 * database file's size on disk — so this is implemented per engine
+	 * rather than generically. Returns null when the size genuinely
+	 * cannot be determined (e.g. insufficient permissions on the
+	 * system schema, or the file path is not resolvable), rather than
+	 * a fabricated or approximate figure.
+	 *
+	 * @return int|null Total size in bytes, or null if it cannot be determined.
+	 */
+	public function get_database_size(): ?int;
+	
+	/**
 	 * Retrieve information about the active database system and connection.
 	 *
 	 * Information is obtained from the active database connection and engine

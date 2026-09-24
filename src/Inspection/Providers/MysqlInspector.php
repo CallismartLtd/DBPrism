@@ -439,4 +439,28 @@ class MysqlInspector extends AbstractInspector {
 			),
 		);
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * Sums data_length + index_length across every table in the
+	 * current schema, via information_schema.TABLES. These figures
+	 * are InnoDB/MyISAM statistics estimates, not an exact byte count
+	 * (MySQL itself documents them as approximate for InnoDB), but are
+	 * the standard way to report database size for MySQL/MariaDB.
+	 */
+	public function get_database_size(): ?int {
+		try {
+			$size = $this->dbal->get_var(
+				sprintf(
+					"SELECT SUM(DATA_LENGTH + INDEX_LENGTH) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s'",
+					addslashes( $this->db_name() )
+				)
+			);
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		return null !== $size ? (int) $size : null;
+	}
 }

@@ -50,6 +50,7 @@ use Callismart\DTO\DTO;
  * @property ?array      $capabilities         Engine capabilities discovered during inspection.
  * @property ?array      $features             Engine-specific feature/version information.
  * @property ?array      $runtime              Additional runtime/server information.
+ * @property ?int        $size_bytes           Total database size in bytes, when determinable.
  *
  * @method void __construct( array{
  *     'engine': string,
@@ -71,6 +72,7 @@ use Callismart\DTO\DTO;
  *     'server_os': ?string,
  *     'server_architecture': ?string,
  *     'server_hostname': ?string,
+ * 	   'size_bytes': ?int,
  *     'capabilities': ?array,
  *     'features': ?array,
  *     'runtime': ?array,
@@ -104,6 +106,7 @@ final class DatabaseInfoDTO extends DTO {
 			'server_os',
 			'server_architecture',
 			'server_hostname',
+			'size_bytes',
 			'capabilities',
 			'features',
 			'runtime',
@@ -152,7 +155,8 @@ final class DatabaseInfoDTO extends DTO {
 			'server_hostname'
 				=> null === $value ? null : (string) $value,
 
-			'port'
+			'port',
+			'size_bytes'
 				=> null === $value ? null : (int) $value,
 
 			'ssl'

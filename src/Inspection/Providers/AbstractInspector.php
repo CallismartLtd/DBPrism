@@ -77,12 +77,21 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * only where the database cannot provide the corresponding information.
 	 *
 	 * Concrete inspectors may override inspect_database_info() to provide
-	 * engine-specific information.
+	 * engine-specific information. size_bytes is populated automatically
+	 * via get_database_size() unless inspect_database_info() already
+	 * supplied it explicitly — concrete inspectors don't need to
+	 * remember to wire it in themselves.
 	 *
 	 * @return DatabaseInfoDTO
 	 */
 	public function get_database_info(): DatabaseInfoDTO {
-		return new DatabaseInfoDTO( $this->inspect_database_info() );
+		$data = $this->inspect_database_info();
+
+		if ( ! array_key_exists( 'size_bytes', $data ) ) {
+			$data['size_bytes'] = $this->get_database_size();
+		}
+
+		return new DatabaseInfoDTO( $data );
 	}
 
 	/**
@@ -98,6 +107,18 @@ abstract class AbstractInspector implements InspectionInterface {
 	 */
 	abstract protected function inspect_database_info(): array;
 
+	/**
+	 * Get the total size of the current database, in bytes.
+	 *
+	 * Implementation is engine-specific: a MySQL/PostgreSQL inspector
+	 * queries its system catalog; a SQLite inspector reads the database
+	 * file's size from disk. Must return null, not a guess, when the
+	 * size cannot be reliably determined.
+	 *
+	 * @return int|null
+	 */
+	abstract public function get_database_size(): ?int;
+	
 	/*
 	|------------------------------------------
 	| SCHEMA TYPE NORMALIZATION

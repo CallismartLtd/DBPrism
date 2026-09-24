@@ -380,4 +380,22 @@ class PostgresInspector extends AbstractInspector {
 			),
 		);
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * Uses pg_database_size(), PostgreSQL's own reporting function —
+	 * an exact figure (unlike MySQL's estimate-based information_schema
+	 * statistics), but requires CONNECT privilege on the database,
+	 * which is typically granted by default.
+	 */
+	public function get_database_size(): ?int {
+		try {
+			$size = $this->dbal->get_var( 'SELECT pg_database_size(current_database())' );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		return null !== $size ? (int) $size : null;
+	}
 }
