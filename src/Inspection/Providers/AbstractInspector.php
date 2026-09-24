@@ -77,10 +77,12 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * only where the database cannot provide the corresponding information.
 	 *
 	 * Concrete inspectors may override inspect_database_info() to provide
-	 * engine-specific information. size_bytes is populated automatically
-	 * via get_database_size() unless inspect_database_info() already
-	 * supplied it explicitly — concrete inspectors don't need to
-	 * remember to wire it in themselves.
+	 * engine-specific information. size_bytes, cache_hit_ratio,
+	 * connections_active, and connections_max are populated automatically
+	 * via get_database_size(), get_cache_hit_ratio(), and
+	 * get_connection_stats() unless inspect_database_info() already
+	 * supplied them explicitly — concrete inspectors don't need to
+	 * remember to wire these in themselves.
 	 *
 	 * @return DatabaseInfoDTO
 	 */
@@ -89,6 +91,17 @@ abstract class AbstractInspector implements InspectionInterface {
 
 		if ( ! array_key_exists( 'size_bytes', $data ) ) {
 			$data['size_bytes'] = $this->get_database_size();
+		}
+
+		if ( ! array_key_exists( 'cache_hit_ratio', $data ) ) {
+			$data['cache_hit_ratio'] = $this->get_cache_hit_ratio();
+		}
+
+		if ( ! array_key_exists( 'connections_active', $data ) || ! array_key_exists( 'connections_max', $data ) ) {
+			$connection_stats = $this->get_connection_stats();
+
+			$data['connections_active'] ??= $connection_stats['active'];
+			$data['connections_max']    ??= $connection_stats['max'];
 		}
 
 		return new DatabaseInfoDTO( $data );
@@ -118,7 +131,25 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * @return int|null
 	 */
 	abstract public function get_database_size(): ?int;
-	
+
+	/**
+	 * Get the current buffer/page cache hit ratio for this database,
+	 * as a percentage. Must return null for engines with no equivalent
+	 * concept, not a fabricated figure.
+	 *
+	 * @return float|null
+	 */
+	abstract public function get_cache_hit_ratio(): ?float;
+
+	/**
+	 * Get the current and maximum connection counts for this database.
+	 * Must return null for either figure the engine cannot report,
+	 * not a fabricated figure.
+	 *
+	 * @return array{active: int|null, max: int|null}
+	 */
+	abstract public function get_connection_stats(): array;
+
 	/*
 	|------------------------------------------
 	| SCHEMA TYPE NORMALIZATION

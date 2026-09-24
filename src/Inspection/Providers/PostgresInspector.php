@@ -398,4 +398,56 @@ class PostgresInspector extends AbstractInspector {
 
 		return null !== $size ? (int) $size : null;
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * Computed from pg_stat_database, scoped to the current database
+	 * only (unlike MySQL's shared buffer pool, Postgres tracks
+	 * blocks_hit/blocks_read per database): blks_hit / (blks_hit + blks_read) × 100.
+	 */
+	public function get_cache_hit_ratio(): ?float {
+		try {
+			$row = $this->dbal->get_row(
+				'SELECT blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database()'
+			);
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		if ( ! is_array( $row ) ) {
+			return null;
+		}
+
+		$hit  = (int) ( $row['blks_hit'] ?? 0 );
+		$read = (int) ( $row['blks_read'] ?? 0 );
+		$total = $hit + $read;
+
+		if ( $total <= 0 ) {
+			// No block reads recorded yet — the ratio is undefined,
+			// not zero.
+			return null;
+		}
+
+		return round( ( $hit / $total ) * 100, 2 );
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function get_connection_stats(): array {
+		try {
+			$active_value = $this->dbal->get_var(
+				'SELECT COUNT(*) FROM pg_stat_activity WHERE datname = current_database()'
+			);
+			$max_value    = $this->dbal->get_var( "SELECT current_setting('max_connections')" );
+		} catch ( \Throwable $e ) {
+			return array( 'active' => null, 'max' => null );
+		}
+
+		$active = null !== $active_value ? (int) $active_value : null;
+		$max    = null !== $max_value ? (int) $max_value : null;
+
+		return array( 'active' => $active, 'max' => $max );
+	}
 }

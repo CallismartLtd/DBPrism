@@ -463,4 +463,53 @@ class MysqlInspector extends AbstractInspector {
 
 		return null !== $size ? (int) $size : null;
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * Computed from the InnoDB buffer pool's cumulative read counters:
+	 * (1 − physical_reads / logical_read_requests) × 100. These are
+	 * server-wide cumulative counters since the last restart, not
+	 * scoped to this database alone — MySQL has one shared buffer
+	 * pool across all schemas, so a per-database figure isn't
+	 * meaningful here the way it is for Postgres.
+	 */
+	public function get_cache_hit_ratio(): ?float {
+		try {
+			$reads    = $this->dbal->get_row( "SHOW STATUS LIKE 'Innodb_buffer_pool_reads'" );
+			$requests = $this->dbal->get_row( "SHOW STATUS LIKE 'Innodb_buffer_pool_read_requests'" );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		$reads_val    = is_array( $reads ) ? (int) ( $reads['Value'] ?? 0 ) : null;
+		$requests_val = is_array( $requests ) ? (int) ( $requests['Value'] ?? 0 ) : null;
+
+		if ( null === $reads_val || null === $requests_val || $requests_val <= 0 ) {
+			// No read activity recorded yet — the ratio is undefined,
+			// not zero.
+			return null;
+		}
+
+		$ratio = ( 1 - ( $reads_val / $requests_val ) ) * 100;
+
+		return round( max( 0, min( 100, $ratio ) ), 2 );
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function get_connection_stats(): array {
+		try {
+			$active_row = $this->dbal->get_row( "SHOW STATUS LIKE 'Threads_connected'" );
+			$max_value  = $this->dbal->get_var( 'SELECT @@max_connections' );
+		} catch ( \Throwable $e ) {
+			return array( 'active' => null, 'max' => null );
+		}
+
+		$active = is_array( $active_row ) && isset( $active_row['Value'] ) ? (int) $active_row['Value'] : null;
+		$max    = null !== $max_value ? (int) $max_value : null;
+
+		return array( 'active' => $active, 'max' => $max );
+	}
 }

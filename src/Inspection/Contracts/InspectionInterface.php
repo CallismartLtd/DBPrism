@@ -244,7 +244,35 @@ interface InspectionInterface {
 	 * @return int|null Total size in bytes, or null if it cannot be determined.
 	 */
 	public function get_database_size(): ?int;
-	
+
+	/**
+	 * Get the current buffer/page cache hit ratio for this database,
+	 * as a percentage (0–100).
+	 *
+	 * This reflects the engine's own shared data cache — MySQL's InnoDB
+	 * buffer pool, PostgreSQL's shared buffers — not any
+	 * application-level or OPcache-style cache. Returns null when the
+	 * engine has no such concept (e.g. SQLite, which is file-based
+	 * with no shared server-side buffer cache to measure) or when the
+	 * ratio cannot be determined (e.g. no read activity yet, so the
+	 * ratio is undefined rather than zero).
+	 *
+	 * @return float|null Hit ratio as a percentage, or null if not applicable/available.
+	 */
+	public function get_cache_hit_ratio(): ?float;
+
+	/**
+	 * Get the current and maximum connection counts for this database.
+	 *
+	 * Returns null for either figure when the engine cannot report it
+	 * (e.g. SQLite has no server-side connection limit or shared
+	 * connection registry to query — it's an in-process, single-writer
+	 * file format, so this concept doesn't apply).
+	 *
+	 * @return array{active: int|null, max: int|null}
+	 */
+	public function get_connection_stats(): array;
+
 	/**
 	 * Retrieve information about the active database system and connection.
 	 *

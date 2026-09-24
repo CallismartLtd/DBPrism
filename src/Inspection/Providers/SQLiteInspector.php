@@ -538,4 +538,29 @@ class SQLiteInspector extends AbstractInspector {
 
 		return (int) $page_size * (int) $page_count;
 	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * SQLite has no shared, server-side buffer cache to measure — its
+	 * page cache is private to each process/connection and not exposed
+	 * via any PRAGMA as a cumulative hit/miss ratio. This genuinely
+	 * does not apply here, so null is returned rather than a
+	 * fabricated figure.
+	 */
+	public function get_cache_hit_ratio(): ?float {
+		return null;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * SQLite is an in-process, file-based database with no connection
+	 * registry or configurable connection limit to report — "active
+	 * connections" and "max connections" are concepts that belong to
+	 * client-server database engines, not SQLite.
+	 */
+	public function get_connection_stats(): array {
+		return array( 'active' => null, 'max' => null );
+	}
 }

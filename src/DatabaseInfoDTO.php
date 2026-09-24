@@ -51,7 +51,10 @@ use Callismart\DTO\DTO;
  * @property ?array      $features             Engine-specific feature/version information.
  * @property ?array      $runtime              Additional runtime/server information.
  * @property ?int        $size_bytes           Total database size in bytes, when determinable.
- *
+ * @property ?float      $cache_hit_ratio      Buffer/page cache hit ratio as a percentage (0–100), when the engine exposes one.
+ * @property ?int        $connections_active   Currently active connections to this database, when determinable.
+ * @property ?int        $connections_max      Maximum allowed connections, when determinable.
+ * 
  * @method void __construct( array{
  *     'engine': string,
  *     'product': ?string,
@@ -73,6 +76,9 @@ use Callismart\DTO\DTO;
  *     'server_architecture': ?string,
  *     'server_hostname': ?string,
  * 	   'size_bytes': ?int,
+ *     'cache_hit_ratio': ?float,
+ *     'connections_active': ?int,
+ *     'connections_max': ?int,
  *     'capabilities': ?array,
  *     'features': ?array,
  *     'runtime': ?array,
@@ -107,6 +113,9 @@ final class DatabaseInfoDTO extends DTO {
 			'server_architecture',
 			'server_hostname',
 			'size_bytes',
+			'cache_hit_ratio',
+			'connections_active',
+			'connections_max',
 			'capabilities',
 			'features',
 			'runtime',
@@ -156,8 +165,13 @@ final class DatabaseInfoDTO extends DTO {
 				=> null === $value ? null : (string) $value,
 
 			'port',
-			'size_bytes'
+			'size_bytes',
+			'connections_active',
+			'connections_max'
 				=> null === $value ? null : (int) $value,
+
+			'cache_hit_ratio'
+				=> null === $value ? null : (float) $value,
 
 			'ssl'
 				=> null === $value ? null : (bool) $value,
