@@ -79,6 +79,7 @@ class SqliteAdapterTest extends TestCase {
         $adapter  = new SqliteAdapter( $config );
         $expected = $this->temp_db_dir . DIRECTORY_SEPARATOR . 'test_db.db';
 
+        $adapter->connect();
         $this->assertTrue( $adapter->is_connected() );
         $this->assertFileExists( $expected );
 
@@ -93,6 +94,7 @@ class SqliteAdapterTest extends TestCase {
         $adapter  = new SqliteAdapter( $config );
         $expected = $this->temp_db_dir . DIRECTORY_SEPARATOR . 'app.sqlite3';
 
+        $adapter->connect();
         $this->assertTrue( $adapter->is_connected() );
         $this->assertFileExists( $expected );
 
@@ -103,6 +105,8 @@ class SqliteAdapterTest extends TestCase {
         $config = new DBConfigDTO(); // empty dbname
 
         $adapter = new SqliteAdapter( $config );
+
+        $adapter->connect();
 
         $this->assertFalse( $adapter->is_connected() );
         $this->assertNotNull( $adapter->get_last_error() );

@@ -54,7 +54,6 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      */
     public function __construct( DBConfigDTO $config ) {
         $this->config = $config;
-        $this->connect();
     }
 
     /**
@@ -69,7 +68,7 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      *
      * @return bool True on success, false on failure.
      */
-    protected function connect() {
+    public function connect() : bool {
         if ( $this->is_connected() ) {
             return true;
         }

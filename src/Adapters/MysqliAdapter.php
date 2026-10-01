@@ -56,7 +56,6 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      */
     public function __construct( DBConfigDTO $config ) {
         $this->config = $config;
-        $this->connect();
     }
 
     /**
@@ -71,7 +70,7 @@ class MysqliAdapter implements DatabaseAdapterInterface {
      *
      * @return bool True on success, false on failure.
      */
-    protected function connect() : bool {
+    public function connect() : bool {
         try {
             if ( $this->is_connected() ) {
                 return true;

@@ -41,6 +41,7 @@ class MysqliAdapterTest extends TestCase {
         ]);
 
         $this->adapter = new MysqliAdapter( $config);
+        $this->adapter->connect();
 
         if (!$this->adapter->is_connected()) {
             $this->markTestSkipped('MySQL connection failed. Skipping integration tests.');
@@ -84,6 +85,7 @@ class MysqliAdapterTest extends TestCase {
         ]);
 
         $bad_adapter = new MysqliAdapter($bad_config);
+        $bad_adapter->connect();
 
         $this->assertFalse($bad_adapter->is_connected());
         $this->assertNotNull($bad_adapter->get_last_error());

@@ -17,6 +17,13 @@ use Callismart\DBPrism\DBConfigDTO;
  * database engine.
  */
 interface DatabaseAdapterInterface {
+    /**
+     * Connect to the database.
+     * 
+     * @return bool True on success, false on failure. Error message is available
+     * using ::get_last_error()
+     */
+    public function connect() : bool;
 
     /**
      * Begin a database transaction.

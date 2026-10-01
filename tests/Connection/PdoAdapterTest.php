@@ -67,6 +67,7 @@ class PdoAdapterTest extends TestCase {
         }
 
         $this->adapter = new PdoAdapter( $config );
+        $this->adapter->connect();
 
         if ( ! $this->adapter->is_connected() ) {
             $this->markTestSkipped( 'PDO connection failed. Skipping integration tests.' );
@@ -122,6 +123,7 @@ class PdoAdapterTest extends TestCase {
         ] );
 
         $bad_adapter = new PdoAdapter( $bad_config );
+        $bad_adapter->connect();
 
         $this->assertFalse( $bad_adapter->is_connected() );
         $this->assertNotNull( $bad_adapter->get_last_error() );
@@ -283,10 +285,13 @@ class PdoAdapterTest extends TestCase {
     public function test_build_sqlite_dsn_paths(): void {
         $config_memory  = new DBConfigDTO( [ 'driver' => 'sqlite', 'dbname' => ':memory:' ] );
         $adapter_memory = new PdoAdapter( $config_memory );
+        $adapter_memory->connect();
+
         $this->assertTrue( $adapter_memory->is_connected() );
 
         $config_file  = new DBConfigDTO( [ 'driver' => 'sqlite', 'dbname' => 'app', 'path' => '/tmp' ] );
         $adapter_file = new PdoAdapter( $config_file );
+        $adapter_file->connect();
         $this->assertTrue( $adapter_file->is_connected() );
     }
 }

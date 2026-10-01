@@ -34,6 +34,7 @@ class PostgresAdapterTest extends TestCase {
         ] );
 
         $this->adapter = new PdoAdapter( $config );
+        $this->adapter->connect();
 
         if ( ! $this->adapter->is_connected() ) {
             $this->markTestSkipped( 'PostgreSQL connection failed. Skipping integration tests.' );

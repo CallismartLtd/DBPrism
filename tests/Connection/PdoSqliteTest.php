@@ -29,6 +29,7 @@ class PdoSqliteTest extends TestCase {
         ] );
 
         $this->adapter = new PdoAdapter( $config );
+        $this->adapter->connect();
 
         if ( ! $this->adapter->is_connected() ) {
             $this->markTestSkipped( 'PDO SQLite connection failed. Skipping test.' );

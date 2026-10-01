@@ -64,7 +64,6 @@ class PdoAdapter implements DatabaseAdapterInterface {
      */
     public function __construct( DBConfigDTO $config ) {
         $this->config = $config;
-        $this->connect();
     }
 
     /**
@@ -79,7 +78,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
      *
      * @return bool True on success, false on failure.
      */
-    protected function connect() : bool {
+    public function connect() : bool {
         if ( $this->is_connected() ) {
             return true;
         }
