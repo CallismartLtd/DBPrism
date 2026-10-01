@@ -16,15 +16,19 @@ use Callismart\DBPrism\DBConfigDTO;
 /**
  * Placeholder adapter that never connects.
  *
- * Lets a Database instance be constructed when no usable connection exists
- * yet (for example during installation, before credentials are configured),
- * so dependent services can still be built. Swap it for a real adapter with
+ * Lets a Database instance be constructed when no database is configured
+ * yet (for example during installation, before credentials exist), so
+ * dependent services can still be built. Swap it for a real adapter with
  * Database::set_adapter() once a connection has been verified.
  *
+ * It holds no configuration: get_config() throws, because no valid
+ * DBConfigDTO exists until a database is configured. Check
+ * Database::has_null_adapter() before reading the configuration.
+ *
  * Every query method returns the "nothing happened" value its contract
- * allows and records an error; nothing throws. Callers must therefore treat
- * an empty result as meaningful only when is_connected() is true: from this
- * adapter, an empty result means "no database", not "no rows".
+ * allows and records an error; none of them throw. Callers must therefore
+ * treat an empty result as meaningful only when is_connected() is true:
+ * from this adapter, an empty result means "no database", not "no rows".
  *
  * Transactions are no-ops.
  */
@@ -50,11 +54,9 @@ final class NullDBAdapter implements DatabaseAdapterInterface {
 	/**
 	 * Class constructor.
 	 *
-	 * @param DBConfigDTO $config The (possibly incomplete) database configuration, returned by get_config().
-	 * @param string      $reason Message reported by get_last_error() after any operation.
+	 * @param string $reason Message reported by get_last_error() after any operation.
 	 */
 	public function __construct(
-		private readonly DBConfigDTO $config,
 		private readonly string $reason = self::DEFAULT_REASON
 	) {}
 
@@ -201,10 +203,15 @@ final class NullDBAdapter implements DatabaseAdapterInterface {
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * No configuration exists for the placeholder adapter.
+	 *
+	 * @return DBConfigDTO Never returns.
+	 * @throws \LogicException Always.
 	 */
 	public function get_config() : DBConfigDTO {
-		return $this->config;
+		throw new \LogicException(
+			sprintf( '%s has no database configuration: %s', self::class, $this->reason )
+		);
 	}
 
 	/**
