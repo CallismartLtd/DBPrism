@@ -9,6 +9,7 @@
 namespace Callismart\DBPrism;
 
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Adapters\NullDBAdapter;
 
 /**
  * Database abstraction API.
@@ -16,6 +17,8 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * Database singleton class for Smart License Server.
  *
  * Acts as a proxy to the environment-specific database adapter.
+ *
+ * @method bool connect() Connect to the database.
  *
  * @method array|null get_row( string $query, array $params = [] ) Retrieve a single row as an associative array.
  * @method array get_results( string $query, array $params = [] ) Retrieve multiple rows as an array of associative arrays.
@@ -30,36 +33,18 @@ use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
  * @method void rollback() Roll back the current transaction.
  *
  * @method string|null get_last_error() Get last database error.
- * @method string get_last_query() Get last executed query string.
  * @method int|null get_insert_id() Get the last insertion ID.
  *
  * @method bool exec(string $query) Execute a raw SQL query without prepared statements.
  * @method int execute( string $query, array $params = [] ) Execute a parameterized query and return the number of affected rows.
  *
- * @method string get_server_version() Get the database server version.
  * @method string get_driver() Get the engine type (mysql, sqlite, etc).
- * @method string|null get_host_info() Get connection host information.
- * @method string|int|null get_protocol_version() Get the database protocol version.
- * @method \Callismart\DBPrism\DBConfigDTO get_config() Get the database protocol version.
+ * @method \Callismart\DBPrism\DBConfigDTO get_config() Get the database configuration object.
  *
  * @method bool is_connected() Check whether the database connection is alive.
  * @method void close() Close the active database connection.
  */
 class Database {
-
-    /**
-     * The singleton instance.
-     *
-     * @var Database|null
-     */
-    protected static $instance = null;
-
-    /**
-     * The active adapter instance.
-     *
-     * @var DatabaseAdapterInterface
-     */
-    protected DatabaseAdapterInterface $adapter;
 
     /**
      * Track active transaction nesting level depth.
@@ -72,9 +57,7 @@ class Database {
      *
      * @param DatabaseAdapterInterface $adapter Database adapter instance.
      */
-    public function __construct( DatabaseAdapterInterface $adapter ) {
-        $this->adapter      = $adapter;
-    }
+    public function __construct( protected DatabaseAdapterInterface $adapter ) {}
 
     /**
      * Proxy calls to the adapter methods.
@@ -118,7 +101,7 @@ class Database {
         // start for the top-level request.
         if ( 1 === $this->transaction_depth ) {
             $this->begin_transaction(); 
-            // Note: If this is your SQLiteAdapter,
+            // Note: If this is SQLiteAdapter,
             // it runs 'BEGIN IMMEDIATE TRANSACTION' internally.
         }
 
@@ -185,5 +168,46 @@ class Database {
      */
     public function get_adapter() : DatabaseAdapterInterface {
         return $this->adapter;
+    }
+
+    /**
+     * Replace the active adapter for the rest of the request.
+     *
+     * Every holder of this Database instance uses the new adapter from the
+     * next call onward. Typical use: swap a NullDBAdapter for a real adapter
+     * once its credentials have been verified.
+     *
+     * @param DatabaseAdapterInterface $adapter       The adapter to activate.
+     * @param bool                     $close_current Whether to close the outgoing adapter's connection.
+     * @return static
+     * @throws \LogicException When a transaction is open on the current adapter.
+     */
+    public function set_adapter( DatabaseAdapterInterface $adapter, bool $close_current = true ) : static {
+        if ( $adapter === $this->adapter ) {
+            return $this;
+        }
+
+        if ( $this->transaction_depth > 0 ) {
+            throw new \LogicException(
+                'Cannot switch the database adapter while a transaction is open.'
+            );
+        }
+
+        if ( $close_current ) {
+            $this->adapter->close();
+        }
+
+        $this->adapter = $adapter;
+
+        return $this;
+    }
+
+    /**
+     * Whether the active adapter is the NullDBAdapter placeholder.
+     *
+     * @return bool
+     */
+    public function has_null_adapter() : bool {
+        return $this->adapter instanceof NullDBAdapter;
     }
 }
