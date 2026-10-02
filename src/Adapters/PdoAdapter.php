@@ -24,6 +24,18 @@ use Callismart\DBPrism\Utils\SQLStatementSplitter;
 class PdoAdapter implements DatabaseAdapterInterface {
 
     /**
+     * PDO attributes applied to every connection unless the configuration's
+     * `flags` sets them.
+     *
+     * @var array<int, mixed>
+     */
+    protected const DEFAULT_FLAGS = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+
+    /**
      * The PDO connection instance.
      *
      * @var PDO|null
@@ -87,11 +99,9 @@ class PdoAdapter implements DatabaseAdapterInterface {
         try {
             $dsn    = DsnBuilder::build( $this->config );
 
-            $flags  = (array) $this->config->flags ?? [
-                PDO::ATTR_ERRMODE               => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE    => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES      => false,
-            ];
+            // Configured flags override the defaults. "+" keeps the integer
+            // PDO::ATTR_* keys; array_merge() would renumber them.
+            $flags  = (array) ( $this->config->flags ?? [] ) + static::DEFAULT_FLAGS;
 
             $this->pdo = new PDO(
                 $dsn,
@@ -541,7 +551,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
      */
     protected function get_parser(): SQLStatementSplitter {
         if ( $this->splitter === null ) {
-            $this->splitter = new SQLStatementSplitter();
+            $this->splitter = new SQLStatementSplitter( $this->config->driver ?? SQLStatementSplitter::DIALECT_GENERIC );
         }
         return $this->splitter;
     }
