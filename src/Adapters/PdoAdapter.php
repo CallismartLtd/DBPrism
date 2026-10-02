@@ -15,6 +15,7 @@ use PDOException;
 use PDOStatement;
 use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Utils\DsnBuilder;
 use Callismart\DBPrism\Utils\SQLStatementSplitter;
 
 /**
@@ -84,7 +85,7 @@ class PdoAdapter implements DatabaseAdapterInterface {
         }
 
         try {
-            $dsn    = $this->build_dsn();
+            $dsn    = DsnBuilder::build( $this->config );
 
             $flags  = (array) $this->config->flags ?? [
                 PDO::ATTR_ERRMODE               => PDO::ERRMODE_EXCEPTION,
@@ -133,163 +134,6 @@ class PdoAdapter implements DatabaseAdapterInterface {
      */
     public function close() : void {
         $this->pdo = null;
-    }
-
-    /**
-     * Build PDO DSN string from configuration.
-     *
-     * @return string
-     * @throws PDOException
-     */
-    protected function build_dsn() : string {
-
-        if ( isset( $this->config->dsn ) ) {
-            return $this->config->dsn;
-        }
-
-        if ( ! isset( $this->config->driver ) ) {
-            throw new PDOException( 'Database driver was not specified.' );
-        }
-
-        return match ( $this->config->driver ) {
-
-            'mysql'  => $this->build_mysql_dsn(),
-
-            'pgsql'  => $this->build_pgsql_dsn(),
-
-            'sqlite' => $this->build_sqlite_dsn(),
-
-            default  => $this->build_generic_dsn(),
-        };
-    }
-
-    /**
-     * Build MySQL DSN string.
-     *
-     * @return string
-     * @throws PDOException
-     */
-    protected function build_mysql_dsn() : string {
-
-        if ( isset( $this->config->socket ) ) {
-
-            $dsn = sprintf(
-                'mysql:unix_socket=%s;',
-                $this->config->socket
-            );
-
-        } else {
-
-            if ( ! isset( $this->config->dbname ) ) {
-                throw new PDOException( 'Database name was not specified.' );
-            }
-
-            $dsn = sprintf(
-                'mysql:host=%s;dbname=%s;',
-                $this->config->host ?? 'localhost',
-                $this->config->dbname
-            );
-
-            if ( isset( $this->config->port ) ) {
-                $dsn .= sprintf( 'port=%d;', $this->config->port );
-            }
-        }
-
-        if ( isset( $this->config->charset ) ) {
-            $dsn .= sprintf( 'charset=%s;', $this->config->charset );
-        }
-
-        return $dsn;
-    }
-
-    /**
-     * Build PostgreSQL DSN string.
-     *
-     * @return string
-     * @throws PDOException
-     */
-    protected function build_pgsql_dsn() : string {
-
-        if ( ! isset( $this->config->dbname ) ) {
-            throw new PDOException( 'Database name was not specified.' );
-        }
-
-        $dsn = sprintf(
-            'pgsql:host=%s;dbname=%s;',
-            $this->config->host ?? 'localhost',
-            $this->config->dbname
-        );
-
-        if ( isset( $this->config->port ) ) {
-            $dsn .= sprintf( 'port=%d;', $this->config->port );
-        }
-
-        if ( isset( $this->config->charset ) ) {
-            $dsn .= sprintf( 'options=\'--client_encoding=%s\';', $this->config->charset );
-        }
-
-        return $dsn;
-    }
-
-    /**
-     * Build SQLite DSN string.
-     *
-     * @return string
-     * @throws PDOException If SQLite database path/database name is invalid or missing.
-     */
-    protected function build_sqlite_dsn() : string {
-        $dbname = $this->config->dbname ?? '';
-
-        if ( empty( $dbname ) ) {
-            throw new PDOException( 'SQLite database name or path was not specified.' );
-        }
-
-        // Handle in-memory database targets
-        if ( ':memory:' === $dbname ) {
-            return 'sqlite::memory:';
-        }
-
-        // If $dbname is already an absolute path or relative file path
-        // (e.g., /var/db/app.sqlite or database.sqlite).
-        if ( empty( $this->config->path ) ) {
-            return "sqlite:{$dbname}";
-        }
-
-        $path     = rtrim( $this->config->path, '/\\' );
-        $filename = str_contains( $dbname, '.' ) ? $dbname : "{$dbname}.db";
-
-        return "sqlite:{$path}/{$filename}";
-    }
-
-    /**
-     * Build generic DSN string fallback.
-     *
-     * @return string
-     * @throws PDOException
-     */
-    protected function build_generic_dsn() : string {
-
-        $dsn = sprintf(
-            '%s:',
-            $this->config->driver
-        );
-
-        $parts = [];
-
-        foreach ( [ 'host', 'port', 'dbname', 'charset' ] as $key ) {
-
-            if ( isset( $this->config->$key ) ) {
-                $parts[] = sprintf( '%s=%s', $key, $this->config->$key );
-            }
-        }
-
-        if ( empty( $parts ) ) {
-            throw new PDOException(
-                sprintf( 'Unable to build DSN for driver "%s".', $this->config->driver )
-            );
-        }
-
-        return $dsn . implode( ';', $parts ) . ';';
     }
 
     /**

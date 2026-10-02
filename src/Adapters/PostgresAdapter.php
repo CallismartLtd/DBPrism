@@ -9,11 +9,4 @@ class PostgresAdapter extends PdoAdapter {
     public function get_driver() : string {
         return 'pgsql';
     }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function build_dsn(): string {
-        return $this->build_pgsql_dsn();
-    }
 }

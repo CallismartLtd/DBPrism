@@ -50,9 +50,9 @@ function selectDBAdapter() : DatabaseAdapterInterface {
 
     if ( ! isset( $config ) ) {
         $config = new DBConfigDTO([
-            'dbname'    => \getenv( 'DB_NAME' ),
-            'port'      => \getenv( 'DB_PORT' ),
-            'host'      => \getenv( 'DB_HOST' ),
+            'dbname'    => \getenv( 'DB_NAME' ) ?: '',
+            'port'      => \getenv( 'DB_PORT' ) ?: null,
+            'host'      => \getenv( 'DB_HOST' ) ?: '',
             'driver'    => dbDriver(),
             'password'  => 'apiv1',
             'username'  => 'apiv1'
