@@ -493,7 +493,12 @@ class SqliteAdapter implements StreamingAdapterInterface {
             return null;
         };
 
-        $closer = static function () use ( $result ) : void {
+        // The closer holds the adapter: it lives until the stream is closed, so the
+        // connection does too, even when nothing else references the adapter
+        // (its destructor would close the connection under the open result).
+        $adapter = $this;
+
+        $closer = static function () use ( $result, $adapter ) : void {
             try {
                 $result->finalize();
             } catch ( \Throwable $e ) {

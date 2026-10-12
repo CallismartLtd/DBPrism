@@ -650,7 +650,12 @@ class PdoAdapter implements StreamingAdapterInterface {
             return null;
         };
 
-        $closer = static function () use ( $stmt ) : void {
+        // The closer holds the adapter: it lives until the stream is closed, so the
+        // connection does too, even when nothing else references the adapter
+        // (its destructor would close the connection under the open result).
+        $adapter = $this;
+
+        $closer = static function () use ( $stmt, $adapter ) : void {
             try {
                 $stmt->closeCursor();
             } catch ( \Throwable $e ) {
