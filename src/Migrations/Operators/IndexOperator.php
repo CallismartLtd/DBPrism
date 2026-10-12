@@ -7,7 +7,7 @@
  * @since 0.2.0
  */
 
-namespace Callismart\DBPrism\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Operators;
 
 use Callismart\DBPrism\Database;
 use Callismart\DBPrism\Query\SQLBuilder;
@@ -24,7 +24,7 @@ use Callismart\DBPrism\Query\SQLBuilder;
  *
  * @since 0.2.0
  */
-class IndexHelper {
+class IndexOperator {
 
     /**
      * Database abstraction layer.
@@ -92,7 +92,7 @@ class IndexHelper {
      *     ->addComposite('lookup_idx', ['app_slug', 'event_type', 'created_at']);
      */
     public function addComposite( string $index_name, array $columns ) : self {
-        // Check if index already exists
+        // Check if index already exists.
         if ( $this->exists( $index_name ) ) {
             throw new \Exception( "Index '{$index_name}' already exists on table '{$this->table}'" );
         }

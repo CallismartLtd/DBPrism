@@ -7,7 +7,7 @@
  * @since 0.2.0
  */
 
-namespace Callismart\DBPrism\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Operators;
 
 use Callismart\DBPrism\Database;
 use Callismart\DBPrism\Query\SQLBuilder;
@@ -24,15 +24,13 @@ use Callismart\DBPrism\Utils\Constraint;
  *
  * @since 0.2.0
  */
-class ColumnHelper {
+class ColumnOperator {
 	/**
-	 * @param Database $dbal The database abstraction layer.
-	 * @param SQLBuilder $queryBuilder The database engine-agnostic sql builder.
+	 * @param Database $db The database abstraction layer.
 	 * @param string $table The table whose column is in context.
 	 */
 	public function __construct(
-		private Database $dbal,
-		private SQLBuilder $queryBuilder,
+		private Database $db,
 		private string $table
 	) {}
 
@@ -78,13 +76,12 @@ class ColumnHelper {
 		$column		= $this->build_column_definitions( $column, $definitions );
 		$constraint	= $this->build_constraint( $constraints );
 
-		$sql = $this->queryBuilder
+		$sql = $this->query()
 			->alter_table( $this->table )
 			->add_column( $column, $constraint )
 			->build();
 
-		$this->dbal->exec( $sql );
-		$this->queryBuilder->reset();
+		$this->db->exec( $sql );
 
 		return $this;
 	}
@@ -98,13 +95,12 @@ class ColumnHelper {
 			throw new \Exception( "Column '{$column}' does not exist in '{$this->table}'" );
 		}
 
-		$sql = $this->queryBuilder
+		$sql = $this->query()
 			->alter_table( $this->table )
 			->drop_column( $column )
 			->build();
 
-		$this->dbal->exec( $sql );
-		$this->queryBuilder->reset();
+		$this->db->exec( $sql );
 		
 		return $this;
 	}
@@ -123,13 +119,13 @@ class ColumnHelper {
 		}
 
 		try {
-			$sql = $this->queryBuilder
+			$sql = $this->query()
 				->alter_table( $this->table )
 				->rename_column( $old, $new )
 				->build();
 
-			$this->dbal->exec( $sql );
-			$this->queryBuilder->reset();
+			$this->db->exec( $sql );
+
 
 		} catch ( \Exception $e ) {
 			// Let engine-specific fallback be handled at a higher migration layer
@@ -181,13 +177,12 @@ class ColumnHelper {
 		$column		= $this->build_column_definitions( $column, $definitions );
 		$constraint	= $this->build_constraint( $constraints );
 
-		$sql = $this->queryBuilder
+		$sql = $this->query()
 			->alter_table( $this->table )
 			->modify_column( $column, $constraint )
 			->build();
 
-		$this->dbal->exec( $sql );
-		$this->queryBuilder->reset();
+		$this->db->exec( $sql );
 
 		return $this;
 	}
@@ -210,13 +205,12 @@ class ColumnHelper {
 
 		$column	= Column::make( $column )->type( $type );
 
-		$sql = $this->queryBuilder
+		$sql = $this->query()
 			->alter_table( $this->table )
 			->modify_column( $column )
 			->build();
 
-		$this->dbal->exec( $sql );
-		$this->queryBuilder->reset();
+		$this->db->exec( $sql );
 
 		return $this;
 	}
@@ -225,21 +219,21 @@ class ColumnHelper {
 	 * Check existence.
 	 */
 	public function exists( string $column ) : bool {
-		return $this->dbal->column_exists( $this->table, $column );
+		return $this->db->column_exists( $this->table, $column );
 	}
 
 	/**
 	 * Get type.
 	 */
 	public function getType( string $column ) : ?string {
-		return $this->dbal->get_column_type( $this->table, $column );
+		return $this->db->get_column_type( $this->table, $column );
 	}
 
 	/**
 	 * List columns.
 	 */
 	public function list() : array {
-		return $this->dbal->get_columns( $this->table );
+		return $this->db->get_columns( $this->table );
 	}
 
 	/*
@@ -307,5 +301,14 @@ class ColumnHelper {
 		}
 
 		return $constraint;
+	}
+
+	/**
+	 * Start query building
+	 * 
+	 * @return SQLBuilder
+	 */
+	protected function query() : SQLBuilder {
+		return new SQLBuilder( $this->db->get_driver() );
 	}
 }

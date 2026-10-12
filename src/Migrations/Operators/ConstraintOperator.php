@@ -7,7 +7,7 @@
  * @since 0.2.0
  */
 
-namespace Callismart\DBPrism\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Operators;
 
 use Exception;
 use Callismart\DBPrism\Database;
@@ -23,18 +23,16 @@ use Callismart\DBPrism\Utils\Constraint;
  *
  * @since 0.2.0
  */
-class ConstraintHelper {
+class ConstraintOperator {
 
 	/**
 	 * Constructor.
 	 *
-	 * @param Database   $dbal          Database abstraction layer.
-	 * @param SQLBuilder $queryBuilder  The SQL builder.
-	 * @param string $table             The table name.
+	 * @param Database   $db	Database abstraction layer.
+	 * @param string $table		The table name.
 	 */
 	public function __construct( 
-		private Database $dbal, 
-		private SQLBuilder $queryBuilder,
+		private Database $db, 
 		private string $table 
 	) {
         $this->assert_table_exists();
@@ -156,17 +154,17 @@ class ConstraintHelper {
 	 * @return static
 	 */
 	public function drop( string $name ) : static {
-		$engine = $this->dbal->get_driver();
+		$engine = $this->db->get_driver();
 
 		if ( 'sqlite' === $engine ) {
 			$this->sqlite_drop_constraint( $name );
 		} else {
-			$sql = $this->queryBuilder
+			$sql = $this->query()
 				->alter_table( $this->table )
 				->drop_constraint( $name )
 				->build();
 			
-			$this->dbal->exec( $sql );
+			$this->db->exec( $sql );
 		}
 
 		return $this;
@@ -183,15 +181,14 @@ class ConstraintHelper {
 	 * @return static
 	 */
 	public function drop_foreign_key( string $name ) : static {
-		$engine = $this->dbal->get_driver();
-
-		switch( $engine ) {
+	
+		switch( $this->db->get_driver() ) {
 			case 'pgsql':
 				$this->drop( $name );
 				break;
 			case 'mysql':
 				$sql = "ALTER TABLE {$this->table} DROP FOREIGN KEY {$name}";
-				$this->dbal->exec( $sql );
+				$this->db->exec( $sql );
 				break;
 			case 'sqlite':
 				$this->sqlite_drop_foreign_key( $name );
@@ -208,24 +205,22 @@ class ConstraintHelper {
 	 * @return static Fluent.
 	 */
 	public function add_constraint( Constraint $constraint ) : static {
-		$engine = $this->dbal->get_driver();
-
-		if ( 'sqlite' === $engine ) {
+		if ( 'sqlite' === $this->db->get_driver()) {
 			$this->sqlite_add_constraint( $constraint );
 		} else {
-			$sql = $this->queryBuilder
+			$sql = $this->query()
 				->alter_table( $this->table )
 				->add_constraint( $constraint )
 				->build();
 				
-			$this->dbal->exec( $sql );
+			$this->db->exec( $sql );
 		}
 
 		return $this;
 	}
 
     private function assert_table_exists() {
-        if ( $this->dbal->table_exists( $this->table ) ) return;
+        if ( $this->db->table_exists( $this->table ) ) return;
 
         throw new Exception( "ConstraintHelper: The table '{$this->table}' does not exist." );
     }
@@ -252,7 +247,7 @@ class ConstraintHelper {
 	 */
 	private function sqlite_add_constraint( Constraint $constraint ) : void {
 		try {
-			$this->dbal->begin_transaction();
+			$this->db->begin_transaction();
 
 			// Get current table definition
 			$columns = $this->sqlite_get_columns_with_definitions();
@@ -264,9 +259,9 @@ class ConstraintHelper {
 			// Backup and recreate table
 			$this->sqlite_recreate_table( $columns, $constraints );
 
-			$this->dbal->commit();
+			$this->db->commit();
 		} catch ( Exception $e ) {
-			$this->dbal->rollback();
+			$this->db->rollback();
 			throw $e;
 		}
 	}
@@ -280,7 +275,7 @@ class ConstraintHelper {
 	 */
 	private function sqlite_drop_foreign_key( string $fk_name ) : void {
 		try {
-			$this->dbal->begin_transaction();
+			$this->db->begin_transaction();
 
 			// Get current table definition
 			$columns		= $this->sqlite_get_columns_with_definitions();
@@ -298,9 +293,9 @@ class ConstraintHelper {
 			// Backup and recreate table
 			$this->sqlite_recreate_table( $columns, $constraints );
 
-			$this->dbal->commit();
+			$this->db->commit();
 		} catch ( Exception $e ) {
-			$this->dbal->rollback();
+			$this->db->rollback();
 			throw $e;
 		}
 	}
@@ -316,7 +311,7 @@ class ConstraintHelper {
 	 */
 	private function sqlite_drop_constraint( string $name ) : void {
 		try {
-			$this->dbal->begin_transaction();
+			$this->db->begin_transaction();
 
 			// Get current table definition
 			$columns = $this->sqlite_get_columns_with_definitions();
@@ -334,9 +329,9 @@ class ConstraintHelper {
 			// Backup and recreate table
 			$this->sqlite_recreate_table( $columns, $constraints );
 
-			$this->dbal->commit();
+			$this->db->commit();
 		} catch ( Exception $e ) {
-			$this->dbal->rollback();
+			$this->db->rollback();
 			throw $e;
 		}
 	}
@@ -351,7 +346,7 @@ class ConstraintHelper {
 	 */
 	private function sqlite_get_columns_with_definitions() : array {
 		$sql = "PRAGMA table_info({$this->table})";
-		$result = $this->dbal->get_results( $sql );
+		$result = $this->db->get_results( $sql );
 
 		if ( empty( $result ) ) {
 			throw new Exception( "Cannot introspect table '{$this->table}'." );
@@ -393,7 +388,7 @@ class ConstraintHelper {
 
 		// Get foreign keys
 		$fk_sql = "PRAGMA foreign_key_list({$this->table})";
-		$fk_results = $this->dbal->get_results( $fk_sql );
+		$fk_results = $this->db->get_results( $fk_sql );
 
 		foreach ( $fk_results as $fk ) {
 			// PRAGMA foreign_key_list returns: id, seq, table, from, to, on_update, on_delete, match
@@ -418,7 +413,7 @@ class ConstraintHelper {
 
 		// Get unique constraints via index introspection
 		$idx_sql = "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='{$this->table}' AND sql IS NOT NULL";
-		$idx_results = $this->dbal->get_results( $idx_sql );
+		$idx_results = $this->db->get_results( $idx_sql );
 
 		foreach ( $idx_results as $idx ) {
 			// Parse unique constraint from index definition
@@ -461,28 +456,28 @@ class ConstraintHelper {
 		try {
 			// Step 1: Backup data to temporary table
 			$backup_sql = "CREATE TABLE {$temp_table} AS SELECT {$col_list} FROM {$this->table}";
-			$this->dbal->exec( $backup_sql );
+			$this->db->exec( $backup_sql );
 
 			// Step 2: Drop original table
 			$drop_sql = "DROP TABLE {$this->table}";
-			$this->dbal->exec( $drop_sql );
+			$this->db->exec( $drop_sql );
 
 			// Step 3: Recreate table with new constraints
 			$create_sql = $this->sqlite_build_create_table_sql( $columns, $constraints );
-			$this->dbal->exec( $create_sql );
+			$this->db->exec( $create_sql );
 
 			// Step 4: Restore data
 			$restore_sql = "INSERT INTO {$this->table} ({$col_list}) SELECT {$col_list} FROM {$temp_table}";
-			$this->dbal->exec( $restore_sql );
+			$this->db->exec( $restore_sql );
 
 			// Step 5: Clean up
 			$cleanup_sql = "DROP TABLE {$temp_table}";
-			$this->dbal->exec( $cleanup_sql );
+			$this->db->exec( $cleanup_sql );
 
 		} catch ( Exception $e ) {
 			// Attempt cleanup on failure
 			try {
-				$this->dbal->exec( "DROP TABLE IF EXISTS {$temp_table}" );
+				$this->db->exec( "DROP TABLE IF EXISTS {$temp_table}" );
 			} catch ( Exception ) {
 				// Silently ignore cleanup errors
 			}
@@ -551,5 +546,14 @@ class ConstraintHelper {
 
 			default => ''
 		};
+	}
+
+	/**
+	 * Start query building
+	 * 
+	 * @return SQLBuilder
+	 */
+	protected function query() : SQLBuilder {
+		return new SQLBuilder( $this->db->get_driver() );
 	}
 }

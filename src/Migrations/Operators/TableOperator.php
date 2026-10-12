@@ -7,7 +7,7 @@
  * @since 0.2.0
  */
 
-namespace Callismart\DBPrism\Migrations\Helpers;
+namespace Callismart\DBPrism\Migrations\Operators;
 
 use Callismart\DBPrism\Database;
 use Callismart\DBPrism\Query\SQLBuilder;
@@ -22,7 +22,7 @@ use Callismart\DBPrism\Query\SQLBuilder;
  *
  * @since 0.2.0
  */
-class TableHelper {
+class TableOperator {
 
 	/**
 	 * Database engine type.
@@ -34,16 +34,14 @@ class TableHelper {
 	/**
 	 * Constructor.
 	 *
-	 * @param Database    $dbal
-	 * @param SQLBuilder  $queryBuilder
+	 * @param Database    $db
 	 * @param string      $table
 	 */
 	public function __construct( 
-		private Database $dbal, 
-		private SQLBuilder $queryBuilder, 
+		private Database $db, 
 		private string $table 
 	) {
-		$this->engine   = $dbal->get_driver();
+		$this->engine   = $db->get_driver();
 	}
 
 	/**
@@ -54,10 +52,10 @@ class TableHelper {
 	 * @return static
 	 */
 	public function rename( string $new_name ) : static {
-		$sql	= $this->queryBuilder
+		$sql	= $this->query()
 			->alter_table( $this->table )
 			->rename( $new_name );
-		$this->dbal->exec( $sql->build() );
+		$this->db->exec( $sql->build() );
 
 		return $this;
 	}
@@ -65,12 +63,11 @@ class TableHelper {
 	/**
 	 * Begin column operation.
 	 *
-	 * @return ColumnHelper
+	 * @return ColumnOperator
 	 */
-	public function column() : ColumnHelper {
-		return new ColumnHelper(
-			$this->dbal,
-			$this->queryBuilder,
+	public function column() : ColumnOperator {
+		return new ColumnOperator(
+			$this->db,
 			$this->table
 		);
 	}
@@ -78,12 +75,11 @@ class TableHelper {
 	/**
 	 * Begin constraint operation on table.
 	 * 
-	 * @return ConstraintHelper
+	 * @return ConstraintOperator
 	 */
 	public function constraint() {
-		return new ConstraintHelper(
-			$this->dbal,
-			$this->queryBuilder,
+		return new ConstraintOperator(
+			$this->db,
 			$this->table
 		);
 	}
@@ -94,12 +90,12 @@ class TableHelper {
 	 * @return static
 	 */
 	public function truncate( bool $restart = true, bool $cascade = false ) : static {
-		$sql = $this->queryBuilder
+		$sql = $this->query()
 			->truncate_table( $this->table )
 			->restart_identity( $restart )
 			->cascade( $cascade );
 
-		$this->dbal->exec( $sql->build() );
+		$this->db->exec( $sql->build() );
 		return $this;
 	}
 
@@ -111,13 +107,13 @@ class TableHelper {
 	 */
 	public function drop( bool $exists_check = true ) : static {
 
-		$sql	= $this->queryBuilder
+		$sql	= $this->query()
 			->drop_table( $this->table );
 		if ( $exists_check ) {
 			$sql->if_exists();
 		}
 
-		$this->dbal->exec( $sql->build() );
+		$this->db->exec( $sql->build() );
 
 		return $this;
 
@@ -127,13 +123,22 @@ class TableHelper {
 	 * Drop index.
 	 */
 	public function drop_index( string $name ) :static {
-		$sql	= $this->queryBuilder
+		$sql	= $this->query()
 			->alter_table( $this->table )
 			->drop_index( $name );
 		
-		$this->dbal->exec( $sql->build() );
+		$this->db->exec( $sql->build() );
 
 		return $this;
 
+	}
+
+	/**
+	 * Start query building.
+	 * 
+	 * @return SQLBuilder
+	 */
+	public function query() : SQLBuilder {
+		return new SQLBuilder( $this->db->get_driver() );
 	}
 }
