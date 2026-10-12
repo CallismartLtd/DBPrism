@@ -81,29 +81,21 @@ class PostgresInspector extends AbstractInspector {
 	 * Check if a table exists.
 	 */
 	protected function sql_table_exists( string $table ): string {
-		return sprintf(
-			"SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '%s' LIMIT 1",
-			addslashes( $table )
-		);
+		return "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ? LIMIT 1";
 	}
 
 	/**
 	 * Check if a column exists.
 	 */
 	protected function sql_column_exists( string $table, string $column ): string {
-		return sprintf(
-			"SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '%s' AND column_name = '%s' LIMIT 1",
-			addslashes( $table ),
-			addslashes( $column )
-		);
+		return "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ? AND column_name = ? LIMIT 1";
 	}
 
 	/**
 	 * Get column details.
 	 */
 	protected function sql_column_details( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				c.column_name,
 				c.udt_name as column_type,
 				( c.is_nullable = 'YES' ) as is_nullable,
@@ -111,10 +103,8 @@ class PostgresInspector extends AbstractInspector {
 				CASE WHEN pg_get_serial_sequence(t.table_name, c.column_name) IS NOT NULL THEN true ELSE false END as is_auto_increment
 			FROM information_schema.columns c
 			JOIN information_schema.tables t ON c.table_name = t.table_name AND c.table_schema = t.table_schema
-			WHERE c.table_schema = 'public' AND c.table_name = '%s'
-			ORDER BY c.ordinal_position",
-			addslashes( $table )
-		);
+			WHERE c.table_schema = 'public' AND c.table_name = ?
+			ORDER BY c.ordinal_position";
 	}
 
 	/**
@@ -125,8 +115,7 @@ class PostgresInspector extends AbstractInspector {
 	 * column name and are not listed.
 	 */
 	protected function sql_indexes( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				i.relname AS index_name,
 				a.attname AS column_name,
 				ix.indisunique AS is_unique,
@@ -137,10 +126,8 @@ class PostgresInspector extends AbstractInspector {
 			JOIN pg_class i ON i.oid = ix.indexrelid
 			JOIN unnest( ix.indkey ) WITH ORDINALITY AS k( attnum, ord ) ON true
 			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
-			WHERE n.nspname = 'public' AND t.relname = '%s' AND NOT ix.indisprimary
-			ORDER BY i.relname, k.ord",
-			addslashes( $table )
-		);
+			WHERE n.nspname = 'public' AND t.relname = ? AND NOT ix.indisprimary
+			ORDER BY i.relname, k.ord";
 	}
 
 	/**
@@ -149,8 +136,7 @@ class PostgresInspector extends AbstractInspector {
 	 * Columns are listed in key order.
 	 */
 	protected function sql_primary_key( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				a.attname AS column_name,
 				k.ord AS seq_in_index
 			FROM pg_index ix
@@ -158,10 +144,8 @@ class PostgresInspector extends AbstractInspector {
 			JOIN pg_namespace n ON n.oid = t.relnamespace
 			JOIN unnest( ix.indkey ) WITH ORDINALITY AS k( attnum, ord ) ON true
 			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
-			WHERE ix.indisprimary AND n.nspname = 'public' AND t.relname = '%s'
-			ORDER BY k.ord",
-			addslashes( $table )
-		);
+			WHERE ix.indisprimary AND n.nspname = 'public' AND t.relname = ?
+			ORDER BY k.ord";
 	}
 
 	/**
@@ -184,8 +168,7 @@ class PostgresInspector extends AbstractInspector {
 	 * Get foreign keys.
 	 */
 	protected function sql_foreign_keys( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				tc.constraint_name,
 				kcu.column_name,
 				ccu.table_name AS referenced_table,
@@ -193,70 +176,59 @@ class PostgresInspector extends AbstractInspector {
 			FROM information_schema.table_constraints AS tc
 			JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
 			JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name
-			WHERE tc.constraint_type = 'FOREIGN KEY' AND kcu.table_name = '%s'
-			ORDER BY tc.constraint_name, kcu.ordinal_position",
-			addslashes( $table )
-		);
+			WHERE tc.constraint_type = 'FOREIGN KEY' AND kcu.table_name = ?
+			ORDER BY tc.constraint_name, kcu.ordinal_position";
 	}
 
 	/**
 	 * Get unique constraints.
 	 */
 	protected function sql_unique_constraints( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				tc.constraint_name,
 				kcu.column_name,
 				kcu.ordinal_position as seq_in_index
 			FROM information_schema.table_constraints tc
 			JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-			WHERE tc.constraint_type = 'UNIQUE' AND kcu.table_name = '%s' AND tc.table_schema = 'public'
-			ORDER BY tc.constraint_name, kcu.ordinal_position",
-			addslashes( $table )
-		);
+			WHERE tc.constraint_type = 'UNIQUE' AND kcu.table_name = ? AND tc.table_schema = 'public'
+			ORDER BY tc.constraint_name, kcu.ordinal_position";
 	}
 
 	/**
 	 * Get check constraints.
 	 */
 	protected function sql_check_constraints( string $table ): string {
-		return sprintf(
-			"SELECT 
-				constraint_name,
-				check_clause as definition
-			FROM information_schema.check_constraints
-			WHERE constraint_schema = 'public'
-			AND constraint_name IN (
-				SELECT constraint_name FROM information_schema.table_constraints
-				WHERE table_name = '%s' AND constraint_type = 'CHECK'
-			)",
-			addslashes( $table )
-		);
+		// pg_constraint, not information_schema alone: information_schema lists
+		// every NOT NULL column as a CHECK constraint too.
+		return "SELECT 
+				c.conname as constraint_name,
+				cc.check_clause as definition
+			FROM pg_constraint c
+			JOIN pg_class t ON t.oid = c.conrelid
+			JOIN pg_namespace n ON n.oid = t.relnamespace
+			JOIN information_schema.check_constraints cc ON cc.constraint_schema = n.nspname AND cc.constraint_name = c.conname
+			WHERE c.contype = 'c' AND n.nspname = 'public' AND t.relname = ?";
 	}
 
 	/**
 	 * Get table metadata.
 	 */
 	protected function sql_table_metadata( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				NULL as engine,
 				(SELECT datcollate FROM pg_database WHERE datname = current_database()) as charset,
 				NULL as collation,
-				n_live_tup as row_count,
-				obj_description((SELECT oid FROM pg_class WHERE relname = '%s'), 'pg_class') as comment
-			FROM pg_stat_user_tables
-			WHERE relname = '%s'",
-			addslashes( $table ),
-			addslashes( $table )
-		);
+				s.n_live_tup as row_count,
+				obj_description(s.relid, 'pg_class') as comment
+			FROM pg_stat_user_tables s
+			WHERE s.schemaname = 'public' AND s.relname = ?";
 	}
 
 	/**
 	 * Override get_table_metadata to handle PostgreSQL specifics.
 	 */
 	public function get_table_metadata( string $table ): array {
-		$rows = $this->execute_query( $this->sql_table_metadata( $table ) );
+		$rows = $this->execute_query( $this->sql_table_metadata( $table ), [ $table ] );
 
 		if ( empty( $rows ) ) {
 			return array();

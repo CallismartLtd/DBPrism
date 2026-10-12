@@ -17,6 +17,13 @@ namespace Callismart\DBPrism\Inspection\Providers;
 class MysqlInspector extends AbstractInspector {
 
 	/**
+	 * Whether the server is MariaDB, once known.
+	 *
+	 * @var bool|null
+	 */
+	private ?bool $is_mariadb = null;
+
+	/**
 	 * Normalize MySQL column types.
 	 * 
 	 * Converts types like "int(11)", "varchar(255)" to normalized forms.
@@ -64,59 +71,43 @@ class MysqlInspector extends AbstractInspector {
 	 * Get all tables in the database.
 	 */
 	protected function sql_all_tables(): string {
-		return sprintf(
-			"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_TYPE = 'BASE TABLE'",
-			addslashes( $this->db_name() )
-		);
+		return "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'";
 	}
 
 	/**
 	 * Check if a table exists.
 	 */
 	protected function sql_table_exists( string $table ): string {
-		return sprintf(
-			"SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' LIMIT 1",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+		return "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1";
 	}
 
 	/**
 	 * Check if a column exists.
 	 */
 	protected function sql_column_exists( string $table, string $column ): string {
-		return sprintf(
-			"SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND COLUMN_NAME = '%s' LIMIT 1",
-			addslashes( $this->db_name() ),
-			addslashes( $table ),
-			addslashes( $column )
-		);
+		return "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1";
 	}
 
 	/**
 	 * Get column details.
 	 */
 	protected function sql_column_details( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				COLUMN_NAME as column_name,
 				COLUMN_TYPE as column_type,
 				IS_NULLABLE as is_nullable,
 				COLUMN_DEFAULT as column_default,
 				EXTRA as extra
 			FROM INFORMATION_SCHEMA.COLUMNS
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
-			ORDER BY ORDINAL_POSITION",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+			ORDER BY ORDINAL_POSITION";
 	}
 
 	/**
 	 * Override of InspectionInterface::is_column_nullable()
 	 */
 	public function is_column_nullable( string $table, string $column ): ?bool {
-		$rows = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 
 		foreach ( $rows as $row ) {
 			if ( $row['column_name'] === $column ) {
@@ -132,7 +123,7 @@ class MysqlInspector extends AbstractInspector {
 	 * Override to detect auto_increment from EXTRA column.
 	 */
 	public function get_column_details( string $table ): array {
-		$rows    = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows    = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 		$details = array();
 
 		foreach ( $rows as $row ) {
@@ -140,7 +131,7 @@ class MysqlInspector extends AbstractInspector {
 			$details[ $column_name ] = array(
 				'type'           => $this->normalize_type( $row['column_type'] ),
 				'nullable'       => $row['is_nullable'] === 'YES',
-				'default'        => $row['column_default'] ?? null,
+				'default'        => $this->normalize_default( $row['column_default'] ?? null ),
 				'auto_increment' => strpos( $row['extra'], 'auto_increment' ) !== false,
 			);
 		}
@@ -164,34 +155,26 @@ class MysqlInspector extends AbstractInspector {
 	 * Get indexes.
 	 */
 	protected function sql_indexes( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				INDEX_NAME as index_name,
 				COLUMN_NAME as column_name,
 				NOT NON_UNIQUE as is_unique,
 				SEQ_IN_INDEX as seq_in_index
 			FROM INFORMATION_SCHEMA.STATISTICS
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND INDEX_NAME != 'PRIMARY'
-			ORDER BY INDEX_NAME, SEQ_IN_INDEX",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME != 'PRIMARY'
+			ORDER BY INDEX_NAME, SEQ_IN_INDEX";
 	}
 
 	/**
 	 * Get primary key.
 	 */
 	protected function sql_primary_key( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				COLUMN_NAME as column_name,
 				SEQ_IN_INDEX as seq_in_index
 			FROM INFORMATION_SCHEMA.STATISTICS
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND INDEX_NAME = 'PRIMARY'
-			ORDER BY SEQ_IN_INDEX",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = 'PRIMARY'
+			ORDER BY SEQ_IN_INDEX";
 	}
 
 	/**
@@ -207,18 +190,14 @@ class MysqlInspector extends AbstractInspector {
 	 * Get foreign keys.
 	 */
 	protected function sql_foreign_keys( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				CONSTRAINT_NAME as constraint_name,
 				COLUMN_NAME as column_name,
 				REFERENCED_TABLE_NAME as referenced_table,
 				REFERENCED_COLUMN_NAME as referenced_column
 			FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND REFERENCED_TABLE_NAME IS NOT NULL
-			ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+			ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
 	}
 
 	/**
@@ -227,52 +206,94 @@ class MysqlInspector extends AbstractInspector {
 	 * MySQL doesn't distinguish unique constraints from unique indexes, so we query indexes.
 	 */
 	protected function sql_unique_constraints( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				INDEX_NAME as constraint_name,
 				COLUMN_NAME as column_name,
 				SEQ_IN_INDEX as seq_in_index
 			FROM INFORMATION_SCHEMA.STATISTICS
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND NON_UNIQUE = 0 AND INDEX_NAME != 'PRIMARY'
-			ORDER BY INDEX_NAME, SEQ_IN_INDEX",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND NON_UNIQUE = 0 AND INDEX_NAME != 'PRIMARY'
+			ORDER BY INDEX_NAME, SEQ_IN_INDEX";
 	}
 
 	/**
 	 * Get check constraints.
-	 * 
-	 * MySQL 8.0.16+ supports CHECK constraints via information_schema.CHECK_CONSTRAINTS.
-	 * For earlier versions, this returns empty array.
+	 *
+	 * MySQL 8.0.16+ and MariaDB 10.2+ list CHECK constraints in
+	 * information_schema.CHECK_CONSTRAINTS. MySQL's view has no TABLE_NAME
+	 * column, so the table comes from TABLE_CONSTRAINTS; MariaDB's has one,
+	 * and names a CHECK constraint per table, so it is matched there too.
 	 */
 	protected function sql_check_constraints( string $table ): string {
-		return sprintf(
-			"SELECT 
-				CONSTRAINT_NAME as constraint_name,
-				CHECK_CLAUSE as definition
-			FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS
-			WHERE CONSTRAINT_SCHEMA = '%s' AND TABLE_NAME = '%s'",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+		if ( $this->is_mariadb() ) {
+			return "SELECT 
+					CONSTRAINT_NAME as constraint_name,
+					CHECK_CLAUSE as definition
+				FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS
+				WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+		}
+
+		return "SELECT 
+				cc.CONSTRAINT_NAME as constraint_name,
+				cc.CHECK_CLAUSE as definition
+			FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc
+			JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+				ON tc.CONSTRAINT_SCHEMA = cc.CONSTRAINT_SCHEMA AND tc.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+			WHERE tc.CONSTRAINT_TYPE = 'CHECK' AND tc.TABLE_SCHEMA = DATABASE() AND tc.TABLE_NAME = ?";
+	}
+
+	/**
+	 * Whether the server is MariaDB.
+	 *
+	 * @return bool
+	 */
+	protected function is_mariadb(): bool {
+		return $this->is_mariadb ??= false !== stripos( (string) $this->dbal->get_var( 'SELECT VERSION()' ), 'MariaDB' );
+	}
+
+	/**
+	 * A column default as information_schema reports it, the same on MySQL and MariaDB.
+	 *
+	 * MariaDB 10.2.7+ reports a literal default quoted ('x') and no default
+	 * as the text NULL; MySQL reports the bare value and SQL NULL. A default
+	 * that is an expression (e.g. current_timestamp()) is left as reported.
+	 *
+	 * @param mixed $default The reported COLUMN_DEFAULT.
+	 * @return mixed
+	 */
+	protected function normalize_default( mixed $default ): mixed {
+		if ( ! is_string( $default ) || ! $this->is_mariadb() ) {
+			return $default;
+		}
+
+		if ( 'NULL' === $default ) {
+			return null;
+		}
+
+		if ( strlen( $default ) >= 2 && "'" === $default[0] && "'" === substr( $default, -1 ) ) {
+			return str_replace( array( "''", '\\\\' ), array( "'", '\\' ), substr( $default, 1, -1 ) );
+		}
+
+		return $default;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function get_column_default( string $table, string $column ) {
+		return $this->normalize_default( parent::get_column_default( $table, $column ) );
 	}
 
 	/**
 	 * Get table metadata.
 	 */
 	protected function sql_table_metadata( string $table ): string {
-		return sprintf(
-			"SELECT 
+		return "SELECT 
 				ENGINE as engine,
 				TABLE_COLLATION as collation,
 				TABLE_COMMENT as comment,
 				TABLE_ROWS as row_count
 			FROM INFORMATION_SCHEMA.TABLES
-			WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
-			addslashes( $this->db_name() ),
-			addslashes( $table )
-		);
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
 	}
 
 	/**
@@ -281,7 +302,7 @@ class MysqlInspector extends AbstractInspector {
 	 * Override to extract charset from collation.
 	 */
 	public function get_table_metadata( string $table ): array {
-		$rows = $this->execute_query( $this->sql_table_metadata( $table ) );
+		$rows = $this->execute_query( $this->sql_table_metadata( $table ), [ $table ] );
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -461,10 +482,7 @@ class MysqlInspector extends AbstractInspector {
 	public function get_database_size(): ?int {
 		try {
 			$size = $this->dbal->get_var(
-				sprintf(
-					"SELECT SUM(DATA_LENGTH + INDEX_LENGTH) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s'",
-					addslashes( $this->db_name() )
-				)
+"SELECT SUM(DATA_LENGTH + INDEX_LENGTH) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE()"
 			);
 		} catch ( \Throwable $e ) {
 			return null;

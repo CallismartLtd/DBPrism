@@ -174,6 +174,18 @@ abstract class AbstractInspector implements InspectionInterface {
 	|------------------------------------------
 	*/
 
+	/*
+	 * Each query below takes its values as ? placeholders, never written into
+	 * the SQL: the inspection methods bind them, in this order —
+	 *
+	 *   sql_all_tables()              no values
+	 *   sql_column_exists()           $table, $column
+	 *   every other sql_*( $table )   $table
+	 *
+	 * The arguments are passed to these methods too, for engines whose SQL
+	 * differs by table, but must not be put into the SQL text.
+	 */
+
 	/**
 	 * Get the SQL query to list all tables.
 	 *
@@ -287,7 +299,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::table_exists()
 	 */
 	public function table_exists( string $table ): bool {
-		$rows = $this->execute_query( $this->sql_table_exists( $table ) );
+		$rows = $this->execute_query( $this->sql_table_exists( $table ), [ $table ] );
 
 		return ! empty( $rows );
 	}
@@ -296,7 +308,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::column_exists()
 	 */
 	public function column_exists( string $table, string $column ): bool {
-		$rows = $this->execute_query( $this->sql_column_exists( $table, $column ) );
+		$rows = $this->execute_query( $this->sql_column_exists( $table, $column ), [ $table, $column ] );
 
 		return ! empty( $rows );
 	}
@@ -305,7 +317,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_columns()
 	 */
 	public function get_columns( string $table ): array {
-		$rows    = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows    = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 		$columns = array();
 
 		foreach ( $rows as $row ) {
@@ -319,7 +331,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_column_type()
 	 */
 	public function get_column_type( string $table, string $column ): ?string {
-		$rows = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 
 		foreach ( $rows as $row ) {
 			if ( $row['column_name'] === $column ) {
@@ -334,7 +346,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_column_details()
 	 */
 	public function get_column_details( string $table ): array {
-		$rows    = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows    = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 		$details = array();
 
 		foreach ( $rows as $row ) {
@@ -361,7 +373,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_indexes()
 	 */
 	public function get_indexes( string $table ): array {
-		$rows    = $this->execute_query( $this->sql_indexes( $table ) );
+		$rows    = $this->execute_query( $this->sql_indexes( $table ), [ $table ] );
 		$indexes = array();
 
 		foreach ( $rows as $row ) {
@@ -384,7 +396,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_primary_key()
 	 */
 	public function get_primary_key( string $table ): ?array {
-		$rows = $this->execute_query( $this->sql_primary_key( $table ) );
+		$rows = $this->execute_query( $this->sql_primary_key( $table ), [ $table ] );
 
 		if ( empty( $rows ) ) {
 			return null;
@@ -403,7 +415,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_foreign_keys()
 	 */
 	public function get_foreign_keys( string $table ): array {
-		$rows         = $this->execute_query( $this->sql_foreign_keys( $table ) );
+		$rows         = $this->execute_query( $this->sql_foreign_keys( $table ), [ $table ] );
 		$foreign_keys = array();
 
 		foreach ( $rows as $row ) {
@@ -440,7 +452,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_unique_constraints()
 	 */
 	public function get_unique_constraints( string $table ): array {
-		$rows        = $this->execute_query( $this->sql_unique_constraints( $table ) );
+		$rows        = $this->execute_query( $this->sql_unique_constraints( $table ), [ $table ] );
 		$constraints = array();
 
 		foreach ( $rows as $row ) {
@@ -460,7 +472,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_check_constraints()
 	 */
 	public function get_check_constraints( string $table ): array {
-		$rows        = $this->execute_query( $this->sql_check_constraints( $table ) );
+		$rows        = $this->execute_query( $this->sql_check_constraints( $table ), [ $table ] );
 		$constraints = array();
 
 		foreach ( $rows as $row ) {
@@ -484,7 +496,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_table_metadata()
 	 */
 	public function get_table_metadata( string $table ): array {
-		$rows = $this->execute_query( $this->sql_table_metadata( $table ) );
+		$rows = $this->execute_query( $this->sql_table_metadata( $table ), [ $table ] );
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -505,7 +517,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::is_column_nullable()
 	 */
 	public function is_column_nullable( string $table, string $column ): ?bool {
-		$rows = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 
 		foreach ( $rows as $row ) {
 			if ( $row['column_name'] === $column ) {
@@ -520,7 +532,7 @@ abstract class AbstractInspector implements InspectionInterface {
 	 * Implementation of InspectionInterface::get_column_default()
 	 */
 	public function get_column_default( string $table, string $column ) {
-		$rows = $this->execute_query( $this->sql_column_details( $table ) );
+		$rows = $this->execute_query( $this->sql_column_details( $table ), [ $table ] );
 
 		foreach ( $rows as $row ) {
 			if ( $row['column_name'] === $column ) {
