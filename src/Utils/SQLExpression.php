@@ -19,12 +19,24 @@ class SQLExpression extends DefaultColumnValue {
      * Create a generic SQL function call with optional arguments.
      * All arguments are string-cast as raw tokens without internal quoting.
      *
+     * The date/time keywords CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME,
+     * LOCALTIME and LOCALTIMESTAMP are returned without parentheses when no
+     * arguments are given, as every engine accepts them.
+     *
      * @param string $function_name The name or signature of the SQL function.
      * @param array  $args          The positional arguments for the function call.
      * @return static
      */
     public static function func( string $function_name, array $args = [] ): static {
         $trimmed_name = trim( $function_name );
+
+        // The SQL date/time keywords take no parentheses: CURRENT_TIMESTAMP() is
+        // valid on MySQL only. Called without arguments, they are returned bare.
+        $keyword = strtoupper( (string) preg_replace( '/\s*\(\s*\)$/', '', $trimmed_name ) );
+
+        if ( empty( $args ) && in_array( $keyword, [ 'CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME', 'LOCALTIME', 'LOCALTIMESTAMP' ], true ) ) {
+            return static::expression( $keyword );
+        }
 
         // If the string already contains parentheses and no extra $args are passed, return as raw expression.
         if ( empty( $args ) && str_contains( $trimmed_name, '(' ) && str_ends_with( $trimmed_name, ')' ) ) {
