@@ -12,13 +12,15 @@ namespace Callismart\DBPrism\Adapters;
 use SQLite3;
 use Exception;
 use Callismart\DBPrism\DBConfigDTO;
+use Callismart\DBPrism\DBResultStream;
+use Callismart\DBPrism\DBResultStreamException;
 use SQLite3Result;
-use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 
 /**
  * Adapter for native SQLite3 database access.
  */
-class SqliteAdapter implements DatabaseAdapterInterface {
+class SqliteAdapter implements StreamingAdapterInterface {
     /**
      * The SQLite3 connection instance.
      *
@@ -449,6 +451,57 @@ class SqliteAdapter implements DatabaseAdapterInterface {
         $result->finalize();
 
         return $affected_rows;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite steps through the result one row per fetch, so nothing more
+     * than the current row is held in memory.
+     *
+     * A statement that returns no rows still runs; stream() then returns false.
+     */
+    public function stream( string $query, array $params = [] ) : DBResultStream|false {
+        $result = $this->query( $query, $params );
+
+        if ( false === $result ) {
+            return false;
+        }
+
+        if ( 0 === $result->numColumns() ) {
+            $result->finalize();
+            $this->last_error = 'stream() expects a query that returns rows.';
+            return false;
+        }
+
+        $sqlite = $this->sqlite;
+
+        $fetcher = static function () use ( $result, $sqlite ) : ?array {
+            $row = $result->fetchArray( SQLITE3_ASSOC );
+
+            if ( false !== $row ) {
+                return $row;
+            }
+
+            // false is also how a failed step looks; 100/101 are SQLITE_ROW/SQLITE_DONE.
+            $code = $sqlite->lastErrorCode();
+
+            if ( 0 !== $code && 100 !== $code && 101 !== $code ) {
+                throw new DBResultStreamException( 'Fetching a row failed: ' . $sqlite->lastErrorMsg(), $code );
+            }
+
+            return null;
+        };
+
+        $closer = static function () use ( $result ) : void {
+            try {
+                $result->finalize();
+            } catch ( \Throwable $e ) {
+                // Already finalized with its statement; nothing left to release.
+            }
+        };
+
+        return new DBResultStream( $fetcher, $closer );
     }
 
     /**

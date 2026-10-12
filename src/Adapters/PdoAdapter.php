@@ -14,14 +14,16 @@ use PDO;
 use PDOException;
 use PDOStatement;
 use Callismart\DBPrism\DBConfigDTO;
-use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\DBResultStream;
+use Callismart\DBPrism\DBResultStreamException;
+use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use Callismart\DBPrism\Utils\DsnBuilder;
 use Callismart\DBPrism\Utils\SQLStatementSplitter;
 
 /**
  * Adapter for PDO database access.
  */
-class PdoAdapter implements DatabaseAdapterInterface {
+class PdoAdapter implements StreamingAdapterInterface {
 
     /**
      * PDO attributes applied to every connection unless the configuration's
@@ -589,6 +591,74 @@ class PdoAdapter implements DatabaseAdapterInterface {
             $this->last_error = $e->getMessage();
             return 0;
         }
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Reads with the driver's forward cursor. On MySQL the statement is
+     * unbuffered, so rows come from the server as they are fetched; until the
+     * stream is closed, this connection cannot run other queries. SQLite reads
+     * row by row as it is. For PostgreSQL use PostgresAdapter, which reads
+     * through a server-side cursor: here libpq would receive the whole result.
+     *
+     * A statement that returns no rows still runs; stream() then returns false.
+     */
+    public function stream( string $query, array $params = [] ) : DBResultStream|false {
+        // pdo_mysql takes the buffering mode from the connection when the
+        // statement is prepared (a prepare() option is ignored), so switch it
+        // off for this statement only.
+        $unbuffer = $this->ensure_connection() && 'mysql' === $this->pdo->getAttribute( PDO::ATTR_DRIVER_NAME );
+        $buffered = $unbuffer ? $this->pdo->getAttribute( PDO::MYSQL_ATTR_USE_BUFFERED_QUERY ) : null;
+
+        if ( $unbuffer ) {
+            $this->pdo->setAttribute( PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false );
+        }
+
+        try {
+            $stmt = $this->query( $query, $params );
+        } finally {
+            if ( $unbuffer && $this->is_connected() ) {
+                $this->pdo->setAttribute( PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered );
+            }
+        }
+
+        if ( false === $stmt ) {
+            return false;
+        }
+
+        if ( 0 === $stmt->columnCount() ) {
+            $stmt->closeCursor();
+            $this->last_error = 'stream() expects a query that returns rows.';
+            return false;
+        }
+
+        $fetcher = static function () use ( $stmt ) : ?array {
+            $row = $stmt->fetch( PDO::FETCH_ASSOC );
+
+            if ( false !== $row ) {
+                return $row;
+            }
+
+            // With a non-exception error mode, false is also how a failed read looks.
+            $code = (string) $stmt->errorCode();
+
+            if ( '' !== $code && '00000' !== $code ) {
+                throw new DBResultStreamException( 'Fetching a row failed: ' . ( $stmt->errorInfo()[2] ?? $code ) );
+            }
+
+            return null;
+        };
+
+        $closer = static function () use ( $stmt ) : void {
+            try {
+                $stmt->closeCursor();
+            } catch ( \Throwable $e ) {
+                // The connection may already be gone; nothing left to release.
+            }
+        };
+
+        return new DBResultStream( $fetcher, $closer );
     }
 
     /**

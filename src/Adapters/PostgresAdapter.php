@@ -1,7 +1,11 @@
 <?php
 namespace Callismart\DBPrism\Adapters;
 
+use PDO;
+use PDOException;
 use PDOStatement;
+use Callismart\DBPrism\DBResultStream;
+use Callismart\DBPrism\DBResultStreamException;
 
 /**
  * Postgres Adapter extending the generic PDO Adapter.
@@ -21,6 +25,20 @@ class PostgresAdapter extends PdoAdapter {
      * @var array<string, string|null>
      */
     protected array $generated_keys = [];
+
+    /**
+     * Rows fetched from the server per round trip while streaming.
+     *
+     * @var int
+     */
+    protected int $stream_batch_size = 1000;
+
+    /**
+     * Counter for unique cursor names on this connection.
+     *
+     * @var int
+     */
+    private int $cursor_sequence = 0;
 
     public function get_driver() : string {
         return 'pgsql';
@@ -61,6 +79,122 @@ class PostgresAdapter extends PdoAdapter {
     protected function capture_insert_id( string $query ) : void {
         if ( $this->is_insert( $query ) ) {
             $this->insert_id = null;
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Reads through a server-side cursor (DECLARE ... CURSOR, then FETCH in
+     * batches of $stream_batch_size), so PHP holds one batch at a time. Without
+     * it, libpq receives the whole result before the first row is returned.
+     *
+     * A cursor only lives inside a transaction:
+     *
+     *  - with a transaction already open, the stream uses it; the cursor ends
+     *    when that transaction ends, so finish reading before committing;
+     *  - otherwise the stream opens one and commits it when it is closed. The
+     *    rows are read from one consistent snapshot. Queries run on this
+     *    adapter before the stream is closed are part of that transaction.
+     *
+     * Unlike MySQL, the connection can run other queries while streaming.
+     */
+    public function stream( string $query, array $params = [] ) : DBResultStream|false {
+        $this->last_error = null;
+
+        if ( ! $this->ensure_connection() ) {
+            return false;
+        }
+
+        $own    = ! $this->pdo->inTransaction();
+        $cursor = 'dbprism_stream_' . ( ++$this->cursor_sequence );
+        $query  = rtrim( $query, "; \t\n\r" );
+
+        try {
+            if ( $own ) {
+                $this->pdo->beginTransaction();
+            }
+        } catch ( PDOException $e ) {
+            $this->last_error = $e->getMessage();
+            return false;
+        }
+
+        // DECLARE only accepts a query that returns rows; anything else fails here, unrun.
+        if ( false === $this->query( "DECLARE {$cursor} NO SCROLL CURSOR FOR {$query}", $params ) ) {
+            if ( $own ) {
+                $this->end_stream_transaction( false );
+            }
+
+            return false;
+        }
+
+        $batch_size = max( 1, $this->stream_batch_size );
+        $batch      = [];
+        $index      = 0;
+        $exhausted  = false;
+
+        $fetcher = function () use ( $cursor, $batch_size, &$batch, &$index, &$exhausted ) : ?array {
+            if ( $index >= count( $batch ) ) {
+                if ( $exhausted ) {
+                    return null;
+                }
+
+                $batch = []; // Release the previous batch before fetching the next.
+                $index = 0;
+                $stmt  = $this->pdo->query( "FETCH {$batch_size} FROM {$cursor}" );
+
+                if ( false === $stmt ) {
+                    throw new DBResultStreamException( 'Fetching rows failed: ' . ( $this->pdo->errorInfo()[2] ?? 'unknown error' ) );
+                }
+
+                $batch     = $stmt->fetchAll( PDO::FETCH_ASSOC );
+                $exhausted = count( $batch ) < $batch_size;
+
+                if ( [] === $batch ) {
+                    return null;
+                }
+            }
+
+            return $batch[ $index++ ];
+        };
+
+        $closer = function () use ( $cursor, $own ) : void {
+            // The cursor ended with its transaction; nothing to close.
+            if ( null === $this->pdo || ! $this->pdo->inTransaction() ) {
+                return;
+            }
+
+            $closed = true;
+
+            try {
+                $this->pdo->exec( "CLOSE {$cursor}" );
+            } catch ( PDOException $e ) {
+                $closed = false; // The transaction failed (e.g. a read error).
+            }
+
+            if ( $own ) {
+                $this->end_stream_transaction( $closed );
+            }
+        };
+
+        return new DBResultStream( $fetcher, $closer );
+    }
+
+    /**
+     * End a transaction stream() opened: commit it, or roll it back when it failed.
+     *
+     * @param bool $commit
+     * @return void
+     */
+    private function end_stream_transaction( bool $commit ) : void {
+        try {
+            $commit ? $this->pdo->commit() : $this->pdo->rollBack();
+        } catch ( PDOException $e ) {
+            try {
+                $this->pdo->rollBack();
+            } catch ( PDOException $e ) {
+                // Nothing left to end.
+            }
         }
     }
 

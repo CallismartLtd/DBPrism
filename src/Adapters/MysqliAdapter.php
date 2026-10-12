@@ -12,14 +12,16 @@ namespace Callismart\DBPrism\Adapters;
 use mysqli;
 use mysqli_stmt;
 use Callismart\DBPrism\DBConfigDTO;
-use Callismart\DBPrism\Adapters\Contracts\DatabaseAdapterInterface;
+use Callismart\DBPrism\DBResultStream;
+use Callismart\DBPrism\DBResultStreamException;
+use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use mysqli_sql_exception;
 use Throwable;
 
 /**
  * Adapter for MySQLi database access.
  */
-class MysqliAdapter implements DatabaseAdapterInterface {
+class MysqliAdapter implements StreamingAdapterInterface {
 
     /**
      * The MySQLi connection instance.
@@ -620,6 +622,75 @@ class MysqliAdapter implements DatabaseAdapterInterface {
         $stmt->close();
 
         return $affected;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Reads unbuffered: the prepared statement's rows are bound with
+     * bind_result() and never stored, so each fetch() pulls the next row
+     * from the server. Until the stream is closed, this connection cannot
+     * run other queries (MySQL "Commands out of sync").
+     *
+     * A statement that returns no rows still runs; stream() then returns false.
+     */
+    public function stream( string $query, array $params = [] ) : DBResultStream|false {
+        $stmt = $this->query( $query, $params );
+
+        if ( false === $stmt ) {
+            return false;
+        }
+
+        try {
+            $meta = $stmt->result_metadata();
+        } catch ( mysqli_sql_exception $e ) {
+            $meta = false;
+        }
+
+        if ( false === $meta ) {
+            $this->last_error = 'stream() expects a query that returns rows.';
+            $stmt->close();
+            return false;
+        }
+
+        $fields = array_map( static fn( $field ) => $field->name, $meta->fetch_fields() );
+        $meta->free();
+
+        // bind_result() writes each fetched row into these slots.
+        $values = array_fill( 0, count( $fields ), null );
+        $stmt->bind_result( ...$values );
+
+        $fetcher = static function () use ( $stmt, $fields, &$values ) : ?array {
+            $fetched = $stmt->fetch();
+
+            if ( null === $fetched ) {
+                return null;
+            }
+
+            if ( false === $fetched ) {
+                throw new DBResultStreamException( 'Fetching a row failed: ' . $stmt->error, $stmt->errno );
+            }
+
+            // Copy the values out: the slots are references that the next fetch() overwrites.
+            $row = [];
+
+            foreach ( $fields as $i => $name ) {
+                $row[ $name ] = $values[ $i ];
+            }
+
+            return $row;
+        };
+
+        $closer = static function () use ( $stmt ) : void {
+            try {
+                $stmt->free_result();
+                $stmt->close();
+            } catch ( Throwable $e ) {
+                // The connection may already be gone; nothing left to release.
+            }
+        };
+
+        return new DBResultStream( $fetcher, $closer );
     }
 
     /**
