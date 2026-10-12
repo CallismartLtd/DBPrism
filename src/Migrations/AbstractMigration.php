@@ -11,10 +11,10 @@ namespace Callismart\DBPrism\Migrations;
 
 use Callismart\DBPrism\Database;
 use Callismart\DBPrism\Inspection\Inspector;
-use Callismart\DBPrism\Migrations\Helpers\ColumnHelper;
-use Callismart\DBPrism\Migrations\Helpers\ConstraintHelper;
-use Callismart\DBPrism\Migrations\Helpers\IndexHelper;
-use Callismart\DBPrism\Migrations\Helpers\TableHelper;
+use Callismart\DBPrism\Migrations\Operators\ColumnOperator;
+use Callismart\DBPrism\Migrations\Operators\ConstraintOperator;
+use Callismart\DBPrism\Migrations\Operators\IndexOperator;
+use Callismart\DBPrism\Migrations\Operators\TableOperator;
 use Callismart\DBPrism\Query\SQLBuilder;
 
 /**
@@ -26,21 +26,6 @@ use Callismart\DBPrism\Query\SQLBuilder;
  * @since 0.2.0
  */
 abstract class AbstractMigration implements MigrationInterface {
-
-    /**
-     * The Database abstraction instance.
-     *
-     * @var Database
-     */
-    protected $database;
-
-    /**
-     * SQL builder instance.
-     *
-     * @var SQLBuilder
-     */
-    protected $sql_builder;
-
     /**
      * Migration start time (for tracking duration).
      *
@@ -51,12 +36,9 @@ abstract class AbstractMigration implements MigrationInterface {
     /**
      * Constructor.
      *
-     * @param Database|null $database The DBAL instance or null to use the global instance.
+     * @param Database|null $db The DBAL instance or null to use the global instance.
      */
-    public function __construct( Database $database ) {
-        $this->database     = $database;
-        $this->sql_builder  = new SQLBuilder( $this->database->get_driver() );
-    }
+    protected function __construct( protected Database $db ) {}
 
     /**
      * {@inheritDoc}
@@ -138,10 +120,10 @@ abstract class AbstractMigration implements MigrationInterface {
      *
      * @param string $table The table name
      *
-     * @return ColumnHelper
+     * @return ColumnOperator
      */
-    protected function column( string $table ) : ColumnHelper {
-        return new ColumnHelper( $this->database, $this->sql_builder, $table );
+    protected function column( string $table ) : ColumnOperator {
+        return new ColumnOperator( $this->db, $table );
     }
 
     /**
@@ -149,10 +131,10 @@ abstract class AbstractMigration implements MigrationInterface {
      *
      * @param string $table The table name
      *
-     * @return IndexHelper
+     * @return IndexOperator
      */
-    protected function index( string $table ) : IndexHelper {
-        return new IndexHelper( $this->database, $this->sql_builder, $table );
+    protected function index( string $table ) : IndexOperator {
+        return new IndexOperator( $this->db, $this->query(), $table );
     }
 
     /**
@@ -160,10 +142,10 @@ abstract class AbstractMigration implements MigrationInterface {
      *
      * @param string $table The table name
      *
-     * @return ConstraintHelper
+     * @return ConstraintOperator
      */
-    protected function constraint( string $table ) : ConstraintHelper {
-        return new ConstraintHelper( $this->database, $this->sql_builder, $table );
+    protected function constraint( string $table ) : ConstraintOperator {
+        return new ConstraintOperator( $this->db, $table );
     }
 
     /**
@@ -172,7 +154,7 @@ abstract class AbstractMigration implements MigrationInterface {
      * @return Inspector
      */
     protected function inspect() : Inspector {
-        return new Inspector( $this->database );
+        return new Inspector( $this->db );
     }
 
     /**
@@ -180,16 +162,16 @@ abstract class AbstractMigration implements MigrationInterface {
      *
      * @param string $table The table name
      *
-     * @return TableHelper
+     * @return TableOperator
      */
-    protected function table( string $table ) : TableHelper {
-        return new TableHelper( $this->database, $this->sql_builder, $table );
+    protected function table( string $table ) : TableOperator {
+        return new TableOperator( $this->db, $table );
     }
 
     /**
      * Execute raw SQL directly.
      *
-     * Use only when helpers don't provide what you need.
+     * Use only when Operators don't provide what you need.
      *
      * @param string $sql The SQL statement
      *
@@ -198,7 +180,7 @@ abstract class AbstractMigration implements MigrationInterface {
      * @throws \Exception On execution failure
      */
     protected function exec( string $sql ) : bool {
-        return $this->database->exec( $sql );
+        return $this->db->exec( $sql );
     }
 
     /**
@@ -207,6 +189,15 @@ abstract class AbstractMigration implements MigrationInterface {
      * @return Database
      */
     protected function database() : Database {
-        return $this->database;
+        return $this->db;
+    }
+
+    /**
+     * Start query building.
+     * 
+     * @return SQLBuilder
+     */
+    protected function query() : SQLBuilder {
+        return new SQLBuilder( $this->db->get_driver() );
     }
 }
