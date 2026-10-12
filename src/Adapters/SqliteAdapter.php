@@ -150,6 +150,8 @@ class SqliteAdapter implements DatabaseAdapterInterface {
      * @return SQLite3Result|false The result object or true on success, false on failure.
      */
     protected function query( $query, array $params = [] ) : SQLite3Result|false {
+        $this->last_error = null;
+
         if ( ! $this->ensure_connection() ) {
             return false;
         }

@@ -226,9 +226,12 @@ class MysqliAdapter implements DatabaseAdapterInterface {
                 return false;
             }
 
-            // Store insert ID for INSERT queries
+            // Store insert ID for INSERT queries. An INSERT that generates none
+            // (no AUTO_INCREMENT column) clears it instead of keeping the last one.
             if ( $this->mysqli->insert_id > 0 ) {
-                $this->insert_id = $this->mysqli->insert_id;
+                $this->insert_id = (int) $this->mysqli->insert_id;
+            } elseif ( $this->is_insert( $query ) ) {
+                $this->insert_id = null;
             }
 
             return $stmt;
@@ -237,6 +240,16 @@ class MysqliAdapter implements DatabaseAdapterInterface {
 
             return false;
         }
+    }
+
+    /**
+     * Whether a statement is an INSERT (or MySQL's REPLACE), which sets the insert ID.
+     *
+     * @param string $query SQL statement.
+     * @return bool
+     */
+    protected function is_insert( string $query ) : bool {
+        return (bool) preg_match( '/^\s*(?:INSERT|REPLACE)\b/i', $query );
     }
 
     /**
@@ -435,7 +448,9 @@ class MysqliAdapter implements DatabaseAdapterInterface {
         }
 
         $stmt->close();
-        return $this->get_insert_id();
+
+        // 0: inserted, but the table generates no ID.
+        return $this->get_insert_id() ?? 0;
     }
 
     /**
