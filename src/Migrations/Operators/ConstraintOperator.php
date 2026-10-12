@@ -1,559 +1,465 @@
 <?php
 /**
- * Constraint Helper class file.
+ * Constraint operator class file.
  *
  * @author Callistus Nwachukwu
- * @package Callismart\DBPrism\Migrations
+ * @package Callismart\DBPrism\Migrations\Operators
  * @since 0.2.0
  */
 
 namespace Callismart\DBPrism\Migrations\Operators;
 
-use Exception;
-use Callismart\DBPrism\Database;
-use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Exceptions\MigrationException;
+use Callismart\DBPrism\Migrations\SQLite\TableDefinition;
+use Callismart\DBPrism\Migrations\SQLite\TableRebuilder;
+use Callismart\DBPrism\Utils\Column;
+use Callismart\DBPrism\Utils\ColumnType;
 use Callismart\DBPrism\Utils\Constraint;
+use InvalidArgumentException;
 
 /**
- * Provides fluent interface for constraint operations.
+ * Constraint operations on one table: the primary key, unique constraints
+ * and foreign keys.
  *
- * Delegates SQL generation to SQLBuilder and execution to Database abstraction layer.
- * 
- * Also performs engine specific migrations for table constraints.
+ *   $this->constraint( 'licenses' )->add_primary_key( 'id' );
+ *   $this->constraint( 'licenses' )->add_unique( 'uq_licenses_key', 'license_key' );
+ *   $this->constraint( 'licenses' )->add_foreign_key(
+ *       Constraint::foreign_key( 'fk_licenses_owner' )
+ *           ->on( 'owner_id' )
+ *           ->references( 'users', 'id' )
+ *           ->on_delete( 'cascade' )
+ *   );
+ *   $this->constraint( 'licenses' )->drop_foreign_key( 'fk_licenses_owner' );
+ *
+ * A unique constraint or foreign key is known by its name: the name is how
+ * the operator checks whether it is already there, so every one of these
+ * operations takes one. A table has at most one primary key, so the primary
+ * key is known by its columns.
+ *
+ * Every operation checks the schema first and does nothing when its change
+ * is already there, so a migration can safely run again.
+ *
+ * Foreign key actions are only written when given: without on_delete() or
+ * on_update(), the engine's own default applies.
+ *
+ * On SQLite, whose ALTER TABLE cannot add or drop constraints, the table is
+ * rebuilt (see TableRebuilder). Only constraints written as table
+ * constraints can be dropped there, and an unnamed unique constraint or
+ * foreign key cannot be found by name.
+ *
+ * Indexes, plain or unique, are managed with the index operator.
  *
  * @since 0.2.0
  */
-class ConstraintOperator {
+class ConstraintOperator extends AbstractOperator {
+
+	/*
+	|-------------
+	| Primary key
+	|-------------
+	*/
 
 	/**
-	 * Constructor.
+	 * Add the primary key.
 	 *
-	 * @param Database   $db	Database abstraction layer.
-	 * @param string $table		The table name.
-	 */
-	public function __construct( 
-		private Database $db, 
-		private string $table 
-	) {
-        $this->assert_table_exists();
-    }
-
-	/**
-	 * Add a primary key constraint.
+	 * Does nothing when the table's primary key is already on these columns,
+	 * in this order. Throws when it has a primary key on other columns.
 	 *
-	 * @param string ...$columns The column or columns
-	 *
+	 * @param string $column  The first key column.
+	 * @param string ...$more Further key columns, in order.
 	 * @return static
+	 * @throws MigrationException When the table or a column does not exist, the table
+	 *                            has a different primary key, or the key cannot be added.
 	 */
-	public function add_primary_key( string ...$columns ) : static {
-		$constraint = Constraint::primary();
-		$constraint->columns    = $columns;
+	public function add_primary_key( string $column, string ...$more ) : static {
+		$columns = [ $column, ...$more ];
 
-		return $this->add_constraint( $constraint );
-	}
+		$this->require_table( 'add a primary key' );
 
-	/**
-	 * Add a unique constraint.
-	 *
-	 * @param string    $name    Constraint name
-	 * @param string ...$columns Columns
-	 *
-	 * @return static
-	 */
-	public function add_unique( ?string $name, string ...$columns ) : static {
+		$current = $this->inspect()->get_primary_key( $this->table );
 
-		if ( empty( $columns ) ) {
-			throw new \Exception( 'ConstraintHelper: At least one column is required for this operation.' );
-		}
-		
-		$constraint             = Constraint::unique( $name );
-		$constraint->columns    = $columns;
+		if ( null !== $current ) {
+			if ( $this->same_columns( $current, $columns ) ) {
+				return $this;
+			}
 
-		return $this->add_constraint( $constraint );
-	}
-
-	/**
-	 * Add a foreign key constraint.
-	 *
-	 * @param string $fk_name       Foreign key name.
-	 * @param string $ref_table     Referenced table
-	 * @param array{
-	 *      on_columns: string[], // The names of the columns on current table.
-	 *      ref_columns: string[], // The name of the columns on the reference table.
-	 *      on_delete_action?: string,
-	 *      on_update_action?: string
-	 * 
-	 * } $definitions
-	 *
-	 * @return static
-	 */
-	public function add_foreign_key( string $fk_name, string $ref_table, array $definitions = [] ) : static {
-		$columns        = (array) ( $definitions['on_columns'] ?? [] );
-		$ref_columns    = (array) ( $definitions['ref_columns'] ?? [] );
-
-		if ( empty( $columns ) ) {
-			throw new \Exception( 'ConstraintHelper: No local column name provided.' );
-		}
-
-		if ( count( $columns ) !== count( $ref_columns ) ) {
-			throw new Exception(
+			throw new MigrationException(
 				sprintf(
-					"ConstraintHelper: Column count mismatch for '%s'. Local has %d column(s), but reference table '%s' has %d.",
+					'Cannot add a primary key on (%s) to table "%s": it already has one on (%s).',
+					implode( ', ', $columns ),
 					$this->table,
-					count($columns),
-					$ref_table,
-					count($ref_columns)
+					implode( ', ', $current )
 				)
 			);
 		}
 
-		if ( '' === $fk_name ) {
-			$col_names  = implode( $columns );
-			$fk_name = "fk_{$this->table}_{$col_names}";
-		}
+		$this->require_columns( $this->table, $columns, 'add a primary key' );
 
-		$constraint = Constraint::foreign_key( $fk_name )
-			->on( ...$columns )
-			->references( $ref_table, ...$ref_columns )
-			->on_delete( $definitions['on_delete_action'] ?? 'CASCADE' )
-			->on_update( $definitions['on_update_action'] ?? 'CASCADE' );
-		
-		return $this->add_constraint( $constraint );
+		return $this->add( Constraint::primary()->on( ...$columns ), 'Adding a primary key' );
 	}
 
 	/**
-	 * Drop a primary key constraint.
+	 * Drop the primary key.
 	 *
-	 * @param string $name Optional. Primary key constraint name (usually auto-generated).
+	 * Does nothing when the table has no primary key.
 	 *
 	 * @return static
+	 * @throws MigrationException When the primary key cannot be dropped, e.g. on SQLite
+	 *                            when its column uses AUTOINCREMENT.
 	 */
-	public function drop_primary_key( ?string $name = null ) : static {
-		// Fallback to generic drop if name not provided
-		$constraint_name = $name ?? 'PRIMARY';
-		
-		return $this->drop( $constraint_name );
+	public function drop_primary_key() : static {
+		if ( ! $this->inspect()->table_exists( $this->table ) || null === $this->inspect()->get_primary_key( $this->table ) ) {
+			return $this;
+		}
+
+		$action = sprintf( 'Dropping the primary key of table "%s"', $this->table );
+
+		if ( $this->is_sqlite() ) {
+			$this->rebuild( fn( TableDefinition $definition ) => $definition->drop_primary_key() );
+			return $this;
+		}
+
+		$name = $this->inspect()->get_primary_key_name( $this->table );
+
+		if ( null === $name ) {
+			throw new MigrationException( sprintf( '%s failed: its name could not be read.', $action ) );
+		}
+
+		$this->run( $this->query()->alter_table( $this->table )->drop_constraint( $name )->build(), $action );
+
+		return $this;
+	}
+
+	/*
+	|--------------------
+	| Unique constraints
+	|--------------------
+	*/
+
+	/**
+	 * Add a unique constraint.
+	 *
+	 * Does nothing when a unique constraint with this name exists; its
+	 * columns are not compared or changed.
+	 *
+	 * @param string $name    The constraint name.
+	 * @param string $column  The first column.
+	 * @param string ...$more Further columns, in order.
+	 * @return static
+	 * @throws MigrationException When the table or a column does not exist, or the constraint
+	 *                            cannot be added, e.g. when existing rows hold duplicate values.
+	 */
+	public function add_unique( string $name, string $column, string ...$more ) : static {
+		$columns = [ $column, ...$more ];
+
+		$this->require_name( $name );
+
+		if ( $this->has_unique( $name ) ) {
+			return $this;
+		}
+
+		$this->require_table( sprintf( 'add unique constraint "%s"', $name ) );
+		$this->require_columns( $this->table, $columns, sprintf( 'add unique constraint "%s"', $name ) );
+
+		return $this->add( Constraint::unique( $name )->on( ...$columns ), sprintf( 'Adding unique constraint "%s"', $name ) );
 	}
 
 	/**
 	 * Drop a unique constraint.
 	 *
-	 * @param string $name Constraint name
+	 * Does nothing when no unique constraint has this name.
 	 *
+	 * @param string $name The constraint name.
 	 * @return static
+	 * @throws MigrationException When the constraint cannot be dropped.
 	 */
 	public function drop_unique( string $name ) : static {
-		return $this->drop( $name );
-	}
-
-	/**
-	 * Drop a constraint.
-	 *
-	 * @param string $name Constraint name
-	 *
-	 * @return static
-	 */
-	public function drop( string $name ) : static {
-		$engine = $this->db->get_driver();
-
-		if ( 'sqlite' === $engine ) {
-			$this->sqlite_drop_constraint( $name );
-		} else {
-			$sql = $this->query()
-				->alter_table( $this->table )
-				->drop_constraint( $name )
-				->build();
-			
-			$this->db->exec( $sql );
+		if ( ! $this->has_unique( $name ) ) {
+			return $this;
 		}
 
-		return $this;
+		return $this->drop( $name, 'unique', sprintf( 'Dropping unique constraint "%s"', $name ) );
+	}
+
+	/*
+	|--------------
+	| Foreign keys
+	|--------------
+	*/
+
+	/**
+	 * Add a foreign key.
+	 *
+	 * Does nothing when a foreign key with this name exists; its definition
+	 * is not compared or changed.
+	 *
+	 * @param Constraint $foreign_key A named foreign key, e.g.
+	 *                                Constraint::foreign_key( 'fk_name' )->on( 'col' )->references( 'table', 'id' ).
+	 * @return static
+	 * @throws InvalidArgumentException When the definition is not a complete, named foreign key.
+	 * @throws MigrationException       When a table or column does not exist, or the key cannot
+	 *                                  be added, e.g. when existing rows break it.
+	 */
+	public function add_foreign_key( Constraint $foreign_key ) : static {
+		if ( 'foreign' !== strtolower( $foreign_key->type ) ) {
+			throw new InvalidArgumentException( sprintf( 'add_foreign_key() expects a foreign key, [%s] given.', $foreign_key->type ) );
+		}
+
+		$name = (string) $foreign_key->name;
+
+		$this->require_name( $name );
+
+		if ( empty( $foreign_key->columns ) || empty( $foreign_key->references_table ) ) {
+			throw new InvalidArgumentException( sprintf( 'Foreign key "%s" needs its columns and the table it references.', $name ) );
+		}
+
+		if ( count( $foreign_key->columns ) !== count( $foreign_key->references_columns ) ) {
+			throw new InvalidArgumentException(
+				sprintf(
+					'Foreign key "%s" has %d column(s) but references %d.',
+					$name,
+					count( $foreign_key->columns ),
+					count( $foreign_key->references_columns )
+				)
+			);
+		}
+
+		if ( $this->inspect()->table_exists( $this->table ) && $this->inspect()->has_foreign_key( $this->table, $name ) ) {
+			return $this;
+		}
+
+		$action = sprintf( 'add foreign key "%s"', $name );
+
+		$this->require_table( $action );
+		$this->require_columns( $this->table, $foreign_key->columns, $action );
+
+		if ( ! $this->inspect()->table_exists( $foreign_key->references_table ) ) {
+			throw new MigrationException(
+				sprintf( 'Cannot %s: the referenced table "%s" does not exist.', $action, $foreign_key->references_table )
+			);
+		}
+
+		$this->require_columns( $foreign_key->references_table, $foreign_key->references_columns, $action );
+
+		return $this->add( $foreign_key, sprintf( 'Adding foreign key "%s"', $name ) );
 	}
 
 	/**
-	 * Drop a foreign key constraint.
+	 * Drop a foreign key.
 	 *
-	 * @param string $name FK name
-	 * 
-	 * NOTE: Droping foreign key in SQLite is not reliable due to
-	 * table rebuild quirks. A walk around is
-	 * to specify the `fk_{localtable}_{reference_column}`
+	 * Does nothing when no foreign key has this name.
+	 *
+	 * @param string $name The foreign key name.
 	 * @return static
+	 * @throws MigrationException When the foreign key cannot be dropped.
 	 */
 	public function drop_foreign_key( string $name ) : static {
-	
-		switch( $this->db->get_driver() ) {
-			case 'pgsql':
-				$this->drop( $name );
-				break;
-			case 'mysql':
-				$sql = "ALTER TABLE {$this->table} DROP FOREIGN KEY {$name}";
-				$this->db->exec( $sql );
-				break;
-			case 'sqlite':
-				$this->sqlite_drop_foreign_key( $name );
-				break;
+		if ( ! $this->inspect()->table_exists( $this->table ) || ! $this->inspect()->has_foreign_key( $this->table, $name ) ) {
+			return $this;
 		}
+
+		return $this->drop( $name, 'foreign', sprintf( 'Dropping foreign key "%s"', $name ) );
+	}
+
+	/*
+	|---------
+	| Helpers
+	|---------
+	*/
+
+	/**
+	 * Add a constraint: in place, or by rebuilding the table on SQLite.
+	 *
+	 * @param Constraint $constraint The constraint.
+	 * @param string     $action     What is being done, for the error message.
+	 * @return static
+	 * @throws MigrationException When the constraint cannot be added.
+	 */
+	private function add( Constraint $constraint, string $action ) : static {
+		if ( $this->is_sqlite() ) {
+			$definition = $this->sqlite_definition( $constraint );
+			$this->rebuild( fn( TableDefinition $table ) => $table->add_constraint( $definition ) );
+
+			return $this;
+		}
+
+		$sql = $this->query()
+			->alter_table( $this->table )
+			->add_constraint( $constraint )
+			->build();
+
+		$this->run( $sql, sprintf( '%s on table "%s"', $action, $this->table ) );
 
 		return $this;
 	}
 
 	/**
-	 * Add constraint to a table
-	 * 
-	 * @param Constraint $constraint
-	 * @return static Fluent.
+	 * Drop a named constraint: in place, or by rebuilding the table on SQLite.
+	 *
+	 * @param string $name   The constraint name.
+	 * @param string $type   The type it must have on SQLite: unique or foreign.
+	 * @param string $action What is being done, for the error message.
+	 * @return static
+	 * @throws MigrationException When the constraint cannot be dropped.
 	 */
-	public function add_constraint( Constraint $constraint ) : static {
-		if ( 'sqlite' === $this->db->get_driver()) {
-			$this->sqlite_add_constraint( $constraint );
-		} else {
-			$sql = $this->query()
-				->alter_table( $this->table )
-				->add_constraint( $constraint )
-				->build();
-				
-			$this->db->exec( $sql );
-		}
+	private function drop( string $name, string $type, string $action ) : static {
+		if ( $this->is_sqlite() ) {
+			$this->rebuild( function ( TableDefinition $table ) use ( $name, $type ) {
+				$found = $table->get_constraint( $name );
 
-		return $this;
-	}
-
-    private function assert_table_exists() {
-        if ( $this->db->table_exists( $this->table ) ) return;
-
-        throw new Exception( "ConstraintHelper: The table '{$this->table}' does not exist." );
-    }
-
-	/**
-	 * ========================================
-	 * SQLite-Specific Table Recreation Methods
-	 * ========================================
-	 * 
-	 * SQLite does not support ALTER TABLE ADD/DROP CONSTRAINT.
-	 * Instead, we must:
-	 * 1. Save existing data
-	 * 2. Drop the old table
-	 * 3. Recreate with the new constraint
-	 * 4. Restore data
-	 */
-
-	/**
-	 * Add a constraint to a SQLite table via table recreation.
-	 *
-	 * @param Constraint $constraint The constraint to add.
-	 * @return void
-	 * @throws Exception
-	 */
-	private function sqlite_add_constraint( Constraint $constraint ) : void {
-		try {
-			$this->db->begin_transaction();
-
-			// Get current table definition
-			$columns = $this->sqlite_get_columns_with_definitions();
-			$constraints = $this->sqlite_get_existing_constraints();
-
-			// Add the new constraint to the collection
-			$constraints[] = $constraint->to_array();
-
-			// Backup and recreate table
-			$this->sqlite_recreate_table( $columns, $constraints );
-
-			$this->db->commit();
-		} catch ( Exception $e ) {
-			$this->db->rollback();
-			throw $e;
-		}
-	}
-
-	/**
-	 * Drop a foreign key constraint from a SQLite table via table recreation.
-	 *
-	 * @param string $fk_name The foreign key name to drop.
-	 * @return void
-	 * @throws Exception
-	 */
-	private function sqlite_drop_foreign_key( string $fk_name ) : void {
-		try {
-			$this->db->begin_transaction();
-
-			// Get current table definition
-			$columns		= $this->sqlite_get_columns_with_definitions();
-			$constraints	= $this->sqlite_get_existing_constraints();
-
-			// Remove the specified foreign key constraint
-			$constraints = array_filter(
-				$constraints,
-				fn( $c ) => ! ( 'foreign' === $c['type'] && $c['name'] === $fk_name )
-			);
-
-			// Reindex array keys
-			$constraints = array_values( $constraints );
-
-			// Backup and recreate table
-			$this->sqlite_recreate_table( $columns, $constraints );
-
-			$this->db->commit();
-		} catch ( Exception $e ) {
-			$this->db->rollback();
-			throw $e;
-		}
-	}
-
-	/**
-	 * Drop a constraint (any type) from a SQLite table via table recreation.
-	 *
-	 * Supports: unique constraints, primary keys, foreign keys, and other constraint types.
-	 *
-	 * @param string $name The constraint name to drop.
-	 * @return void
-	 * @throws Exception
-	 */
-	private function sqlite_drop_constraint( string $name ) : void {
-		try {
-			$this->db->begin_transaction();
-
-			// Get current table definition
-			$columns = $this->sqlite_get_columns_with_definitions();
-			$constraints = $this->sqlite_get_existing_constraints();
-
-			// Remove the constraint by name (works for any type)
-			$constraints = array_filter(
-				$constraints,
-				fn( $c ) => ( $c['name'] ?? null ) !== $name
-			);
-
-			// Reindex array keys
-			$constraints = array_values( $constraints );
-
-			// Backup and recreate table
-			$this->sqlite_recreate_table( $columns, $constraints );
-
-			$this->db->commit();
-		} catch ( Exception $e ) {
-			$this->db->rollback();
-			throw $e;
-		}
-	}
-
-	/**
-	 * Retrieve all column definitions for a table from SQLite schema.
-	 *
-	 * Returns raw column definitions suitable for CREATE TABLE recreation.
-	 *
-	 * @return array Array of column definition strings, keyed by column name.
-	 * @throws Exception
-	 */
-	private function sqlite_get_columns_with_definitions() : array {
-		$sql = "PRAGMA table_info({$this->table})";
-		$result = $this->db->get_results( $sql );
-
-		if ( empty( $result ) ) {
-			throw new Exception( "Cannot introspect table '{$this->table}'." );
-		}
-
-		$columns = [];
-		foreach ( $result as $col ) {
-			// PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-			$def = $col['name'] . ' ' . $col['type'];
-
-			if ( (bool) $col['notnull'] ) {
-				$def .= ' NOT NULL';
-			}
-
-			if ( null !== $col['dflt_value'] ) {
-				$def .= ' DEFAULT ' . $col['dflt_value'];
-			}
-
-			if ( (bool) $col['pk'] ) {
-				$def .= ' PRIMARY KEY';
-			}
-
-			$columns[ $col['name'] ] = $def;
-		}
-
-		return $columns;
-	}
-
-	/**
-	 * Retrieve all existing constraints for a table from SQLite schema.
-	 *
-	 * Returns constraints in a normalized array format compatible with Constraint::to_array().
-	 *
-	 * @return array Array of constraint definitions.
-	 * @throws Exception
-	 */
-	private function sqlite_get_existing_constraints() : array {
-		$constraints = [];
-
-		// Get foreign keys
-		$fk_sql = "PRAGMA foreign_key_list({$this->table})";
-		$fk_results = $this->db->get_results( $fk_sql );
-
-		foreach ( $fk_results as $fk ) {
-			// PRAGMA foreign_key_list returns: id, seq, table, from, to, on_update, on_delete, match
-			$key = 'fk_' . $this->table . '_' . $fk['from'];
-
-			// Accumulate columns for this FK id
-			if ( ! isset( $constraints[ $key ] ) ) {
-				$constraints[ $key ] = [
-					'type'               => 'foreign',
-					'name'               => $key,
-					'columns'            => [],
-					'references_table'   => $fk['table'],
-					'references_columns' => [],
-					'on_delete'          => $fk['on_delete'] ?? 'CASCADE',
-					'on_update'          => $fk['on_update'] ?? 'CASCADE',
-				];
-			}
-
-			$constraints[ $key ]['columns'][] = $fk['from'];
-			$constraints[ $key ]['references_columns'][] = $fk['to'];
-		}
-
-		// Get unique constraints via index introspection
-		$idx_sql = "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='{$this->table}' AND sql IS NOT NULL";
-		$idx_results = $this->db->get_results( $idx_sql );
-
-		foreach ( $idx_results as $idx ) {
-			// Parse unique constraint from index definition
-			if ( stripos( $idx['sql'], 'UNIQUE' ) !== false ) {
-				// Extract columns from the SQL definition
-				if ( preg_match( '/\(([^)]+)\)/', $idx['sql'], $matches ) ) {
-					$cols = array_map( 'trim', explode( ',', $matches[1] ) );
-					$constraints[ $idx['name'] ] = [
-						'type'    => 'unique',
-						'name'    => $idx['name'],
-						'columns' => $cols,
-					];
+				if ( null !== $found && $type !== $found['type'] ) {
+					throw new InvalidArgumentException( sprintf( 'Constraint "%s" is a %s constraint, not %s.', $name, $found['type'], $type ) );
 				}
-			}
+
+				$table->drop_constraint( $name );
+			} );
+
+			return $this;
 		}
 
-		return array_values( $constraints );
+		$sql = $this->query()
+			->alter_table( $this->table )
+			->drop_constraint( $name )
+			->build();
+
+		$this->run( $sql, sprintf( '%s on table "%s"', $action, $this->table ) );
+
+		return $this;
 	}
 
 	/**
-	 * Recreate a SQLite table with new column definitions and constraints.
+	 * Rebuild this SQLite table with an edited definition.
 	 *
-	 * This is the core operation for constraint modifications in SQLite:
-	 * 1. Create a temporary table with the same data
-	 * 2. Drop the original table
-	 * 3. Recreate the original table with new schema
-	 * 4. Copy data back from temporary table
-	 * 5. Drop temporary table
-	 *
-	 * @param array $columns     Column definitions keyed by column name.
-	 * @param array $constraints Constraint definitions.
+	 * @param callable $edit fn( TableDefinition $table ): void
 	 * @return void
-	 * @throws Exception
+	 * @throws MigrationException When the rebuild fails; the table is left as it was.
 	 */
-	private function sqlite_recreate_table( array $columns, array $constraints ) : void {
-		$temp_table = $this->table . '_tmp_' . uniqid();
-		$col_names = array_keys( $columns );
-		$col_list = implode( ', ', $col_names );
+	private function rebuild( callable $edit ) : void {
+		( new TableRebuilder( $this->db ) )->rebuild( $this->table, $edit );
+	}
 
-		try {
-			// Step 1: Backup data to temporary table
-			$backup_sql = "CREATE TABLE {$temp_table} AS SELECT {$col_list} FROM {$this->table}";
-			$this->db->exec( $backup_sql );
+	/**
+	 * A constraint as SQLite writes it inside CREATE TABLE.
+	 *
+	 * Rendered by the SQLite renderer as part of a CREATE TABLE statement for
+	 * this table, then taken out of it, so the text is exactly what the
+	 * renderer writes for a new table.
+	 *
+	 * @param Constraint $constraint The constraint.
+	 * @return string
+	 */
+	private function sqlite_definition( Constraint $constraint ) : string {
+		$sql = $this->query()
+			->create_table( $this->table )
+			->add_column( Column::make( 'column' )->type( ColumnType::INTEGER ) )
+			->add_constraint( $constraint )
+			->build();
 
-			// Step 2: Drop original table
-			$drop_sql = "DROP TABLE {$this->table}";
-			$this->db->exec( $drop_sql );
+		$constraints = TableDefinition::from_sql( $sql )->get_constraints();
 
-			// Step 3: Recreate table with new constraints
-			$create_sql = $this->sqlite_build_create_table_sql( $columns, $constraints );
-			$this->db->exec( $create_sql );
+		return end( $constraints )['sql'];
+	}
 
-			// Step 4: Restore data
-			$restore_sql = "INSERT INTO {$this->table} ({$col_list}) SELECT {$col_list} FROM {$temp_table}";
-			$this->db->exec( $restore_sql );
+	/**
+	 * Whether this table has a unique constraint with the given name.
+	 *
+	 * @param string $name The constraint name.
+	 * @return bool
+	 */
+	private function has_unique( string $name ) : bool {
+		if ( ! $this->inspect()->table_exists( $this->table ) ) {
+			return false;
+		}
 
-			// Step 5: Clean up
-			$cleanup_sql = "DROP TABLE {$temp_table}";
-			$this->db->exec( $cleanup_sql );
-
-		} catch ( Exception $e ) {
-			// Attempt cleanup on failure
-			try {
-				$this->db->exec( "DROP TABLE IF EXISTS {$temp_table}" );
-			} catch ( Exception ) {
-				// Silently ignore cleanup errors
+		foreach ( array_keys( $this->inspect()->get_unique_constraints( $this->table ) ) as $existing ) {
+			if ( $this->same_name( (string) $existing, $name ) ) {
+				return true;
 			}
-			throw new Exception(
-				"Failed to recreate table '{$this->table}': " . $e->getMessage()
-			);
 		}
+
+		return false;
 	}
 
 	/**
-	 * Build a CREATE TABLE statement for SQLite with constraints.
+	 * Throw unless this table exists.
 	 *
-	 * @param array $columns     Column definitions keyed by column name.
-	 * @param array $constraints Constraint definitions from to_array().
-	 * @return string CREATE TABLE SQL statement.
+	 * @param string $action What was to be done, e.g. 'add a primary key'.
+	 * @return void
+	 * @throws MigrationException
 	 */
-	private function sqlite_build_create_table_sql( array $columns, array $constraints ) : string {
-		$sql_parts = [ "CREATE TABLE {$this->table} (\n" ];
-
-		// Add column definitions
-		$col_defs = [];
-		foreach ( $columns as $name => $def ) {
-			$col_defs[] = "\t" . $def;
+	private function require_table( string $action ) : void {
+		if ( ! $this->inspect()->table_exists( $this->table ) ) {
+			throw new MigrationException( sprintf( 'Cannot %s: table "%s" does not exist.', $action, $this->table ) );
 		}
-
-		// Add table-level constraints
-		foreach ( $constraints as $constraint ) {
-			$col_defs[] = $this->sqlite_build_constraint_sql( $constraint );
-		}
-
-		$sql_parts[] = implode( ",\n", $col_defs );
-		$sql_parts[] = "\n)";
-
-		return implode( '', $sql_parts );
 	}
 
 	/**
-	 * Build constraint SQL fragment for inclusion in CREATE TABLE.
+	 * Throw unless every column exists in a table.
 	 *
-	 * @param array $constraint Constraint definition from to_array().
-	 * @return string SQL fragment for the constraint.
+	 * Checked here rather than left to the engine, because SQLite reads a
+	 * quoted name that matches no column as a string instead of failing.
+	 *
+	 * @param string   $table   The table name.
+	 * @param string[] $columns The column names.
+	 * @param string   $action  What was to be done.
+	 * @return void
+	 * @throws MigrationException
 	 */
-	private function sqlite_build_constraint_sql( array $constraint ) : string {
-		$type = $constraint['type'] ?? '';
-
-		return match ( $type ) {
-			'unique' => sprintf(
-                "\tCONSTRAINT %s UNIQUE (%s)", 
-                $constraint['name'], 
-                implode( ', ', $constraint['columns'] )
-            ),
-
-			'foreign' => sprintf(
-				"\tFOREIGN KEY (%s) REFERENCES %s (%s) ON DELETE %s ON UPDATE %s",
-				implode( ', ', $constraint['columns'] ?? [] ),
-				$constraint['references_table'] ?? '',
-				implode( ', ', $constraint['references_columns'] ?? [] ),
-				$constraint['on_delete'] ?? 'CASCADE',
-				$constraint['on_update'] ?? 'CASCADE'
-			),
-
-			'primary' => sprintf(
-				"\tPRIMARY KEY (%s)",
-				implode( ', ', $constraint['columns'] ?? [] )
-			),
-
-			default => ''
-		};
+	private function require_columns( string $table, array $columns, string $action ) : void {
+		foreach ( $columns as $column ) {
+			if ( ! $this->inspect()->column_exists( $table, $column ) ) {
+				throw new MigrationException(
+					sprintf( 'Cannot %s: column "%s" does not exist in table "%s".', $action, $column, $table )
+				);
+			}
+		}
 	}
 
 	/**
-	 * Start query building
-	 * 
-	 * @return SQLBuilder
+	 * Throw unless a constraint name is given.
+	 *
+	 * @param string $name The constraint name.
+	 * @return void
+	 * @throws InvalidArgumentException
 	 */
-	protected function query() : SQLBuilder {
-		return new SQLBuilder( $this->db->get_driver() );
+	private function require_name( string $name ) : void {
+		if ( '' === trim( $name ) ) {
+			throw new InvalidArgumentException( 'A unique constraint or foreign key needs a name; the name is how a migration finds it again.' );
+		}
+	}
+
+	/**
+	 * Whether two column lists are the same, in the same order.
+	 *
+	 * @param string[] $a
+	 * @param string[] $b
+	 * @return bool
+	 */
+	private function same_columns( array $a, array $b ) : bool {
+		if ( count( $a ) !== count( $b ) ) {
+			return false;
+		}
+
+		foreach ( array_values( $a ) as $i => $column ) {
+			if ( ! $this->same_name( $column, $b[ $i ] ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Whether two identifiers name the same object on this engine.
+	 *
+	 * PostgreSQL compares quoted identifiers exactly; MySQL (for columns and
+	 * constraints) and SQLite ignore case.
+	 *
+	 * @param string $a
+	 * @param string $b
+	 * @return bool
+	 */
+	private function same_name( string $a, string $b ) : bool {
+		return 'pgsql' === $this->db->get_driver() ? $a === $b : 0 === strcasecmp( $a, $b );
 	}
 }

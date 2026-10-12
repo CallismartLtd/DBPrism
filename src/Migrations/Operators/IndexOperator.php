@@ -1,299 +1,208 @@
 <?php
 /**
- * Index Helper for Fluent Index Operations
- * 
+ * Index operator class file.
+ *
  * @author Callistus Nwachukwu
- * @package Callismart\DBPrism\Migrations
+ * @package Callismart\DBPrism\Migrations\Operators
  * @since 0.2.0
  */
 
 namespace Callismart\DBPrism\Migrations\Operators;
 
-use Callismart\DBPrism\Database;
-use Callismart\DBPrism\Query\SQLBuilder;
+use Callismart\DBPrism\Exceptions\MigrationException;
+use Callismart\DBPrism\Utils\Constraint;
 
 /**
- * Provides fluent interface for index operations.
+ * Index operations on one table.
  *
- * Handles:
- * - Adding indexes
- * - Dropping indexes
- * - Renaming indexes
- * - Creating composite indexes
- * - Checking index existence
+ *   $this->index( 'licenses' )->create( 'idx_licenses_status', 'status' );
+ *   $this->index( 'licenses' )->create( 'idx_licenses_owner', 'owner_id', 'created_at' );
+ *   $this->index( 'licenses' )->create_unique( 'uniq_licenses_key', 'license_key' );
+ *   $this->index( 'licenses' )->rename( 'idx_licenses_status', 'idx_status' );
+ *   $this->index( 'licenses' )->drop( 'idx_status' );
+ *
+ * An index is known by its name: the name is how the operator checks whether
+ * the index is already there, so every operation takes one. An index on more
+ * than one column (a composite index) is created by listing the columns in
+ * order.
+ *
+ * Every operation checks the schema first and does nothing when its change
+ * is already there, so a migration can safely run again.
+ *
+ * These operations manage indexes, plain or unique. A UNIQUE constraint is
+ * managed with the constraint operator.
  *
  * @since 0.2.0
  */
-class IndexOperator {
+class IndexOperator extends AbstractOperator {
 
-    /**
-     * Database abstraction layer.
-     *
-     * @var Database
-     */
-    private $dbal;
+	/**
+	 * Whether this table has an index with the given name.
+	 *
+	 * @param string $name The index name.
+	 * @return bool
+	 */
+	public function exists( string $name ) : bool {
+		return $this->inspect()->has_index( $this->table, $name );
+	}
 
-    /**
-     * SQL builder.
-     *
-     * @var SQLBuilder
-     */
-    private SQLBuilder $sql_builder;
+	/**
+	 * Create an index.
+	 *
+	 * Does nothing when an index with this name already exists; its columns
+	 * are not compared or changed.
+	 *
+	 * @param string $name      The index name.
+	 * @param string $column    The first indexed column.
+	 * @param string ...$more   Further columns, in order, for a composite index.
+	 * @return static
+	 * @throws MigrationException When the index cannot be created.
+	 */
+	public function create( string $name, string $column, string ...$more ) : static {
+		return $this->add( Constraint::index( $name )->on( $column, ...$more ) );
+	}
 
-    /**
-     * Table name.
-     *
-     * @var string
-     */
-    private $table;
+	/**
+	 * Create a unique index.
+	 *
+	 * Does nothing when an index with this name already exists; its columns
+	 * and uniqueness are not compared or changed.
+	 *
+	 * @param string $name      The index name.
+	 * @param string $column    The first indexed column.
+	 * @param string ...$more   Further columns, in order, for a composite index.
+	 * @return static
+	 * @throws MigrationException When the index cannot be created, e.g. when
+	 *                            existing rows hold duplicate values.
+	 */
+	public function create_unique( string $name, string $column, string ...$more ) : static {
+		return $this->add( Constraint::unique( $name )->on( $column, ...$more ) );
+	}
 
-    /**
-     * Constructor.
-     *
-     * @param Database $dbal    The statement executor
-     * @param SQLBuilder        $sql_builder The SQL builder
-     * @param string            $table       The table name
-     */
-    public function __construct( Database $dbal, SQLBuilder $sql_builder, string $table ) {
-        $this->dbal = $dbal;
-        $this->sql_builder = $sql_builder;
-        $this->table = $table;
-    }
+	/**
+	 * Rename an index.
+	 *
+	 * Does nothing when the index already has the new name ($from is gone and
+	 * $to exists). Throws when both indexes exist, or neither, since then it
+	 * cannot tell which index is meant.
+	 *
+	 * The index is rebuilt under the new name from its columns and uniqueness,
+	 * which works the same way on every engine. Any other property of the
+	 * original index (for example a MySQL prefix length or a PostgreSQL index
+	 * method) is not carried over. The rebuild runs in a transaction, so a
+	 * failure leaves the original index in place.
+	 *
+	 * @param string $from The current index name.
+	 * @param string $to   The new index name.
+	 * @return static
+	 * @throws MigrationException When the rename is ambiguous or fails.
+	 */
+	public function rename( string $from, string $to ) : static {
+		$from_exists = $this->exists( $from );
+		$to_exists   = $this->exists( $to );
 
-    /**
-     * Add a simple index to the table.
-     *
-     * @param string $index_name The index name
-     * @param string $column     The column to index
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If index already exists or operation fails
-     *
-     * @example
-     * $migration->index('users')->add('email_index', 'email');
-     */
-    public function add( string $index_name, string $column ) : self {
-        return $this->addComposite( $index_name, [ $column ] );
-    }
+		if ( ! $from_exists && $to_exists ) {
+			return $this;
+		}
 
-    /**
-     * Add a composite (multi-column) index to the table.
-     *
-     * @param string $index_name The index name
-     * @param array  $columns    Array of column names
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If index already exists or operation fails
-     *
-     * @example
-     * $migration->index('logs')
-     *     ->addComposite('lookup_idx', ['app_slug', 'event_type', 'created_at']);
-     */
-    public function addComposite( string $index_name, array $columns ) : self {
-        // Check if index already exists.
-        if ( $this->exists( $index_name ) ) {
-            throw new \Exception( "Index '{$index_name}' already exists on table '{$this->table}'" );
-        }
+		if ( $from_exists && $to_exists ) {
+			throw new MigrationException(
+				sprintf( 'Cannot rename index "%s" to "%s" on table "%s": both indexes exist.', $from, $to, $this->table )
+			);
+		}
 
-        $sql = $this->sql_builder->add_index( $index_name, $columns );
-        $this->dbal->exec( $sql );
+		if ( ! $from_exists ) {
+			throw new MigrationException(
+				sprintf( 'Cannot rename index "%s" to "%s" on table "%s": neither index exists.', $from, $to, $this->table )
+			);
+		}
 
-        return $this;
-    }
+		$definition = $this->inspect()->get_indexes( $this->table )[ $from ] ?? null;
 
-    /**
-     * Add a unique index to the table.
-     *
-     * @param string       $index_name The index name
-     * @param string|array $columns    Column or array of columns
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If index already exists or operation fails
-     *
-     * @example
-     * $migration->index('users')->addUnique('email_unique', 'email');
-     */
-    public function addUnique( string $index_name, $columns ) : self {
-        // Check if index already exists
-        if ( $this->exists( $index_name ) ) {
-            throw new \Exception( "Index '{$index_name}' already exists on table '{$this->table}'" );
-        }
+		if ( empty( $definition['columns'] ) ) {
+			throw new MigrationException(
+				sprintf( 'Cannot rename index "%s" on table "%s": its columns could not be read.', $from, $this->table )
+			);
+		}
 
-        $columns = (array) $columns;
-        $sql = $this->sql_builder->add_index( $index_name, $columns, 'UNIQUE' );
-        $this->dbal->exec( $sql );
+		$index = ! empty( $definition['unique'] ) ? Constraint::unique( $to ) : Constraint::index( $to );
+		$index->on( ...array_values( $definition['columns'] ) );
 
-        return $this;
-    }
+		$sql = $this->query()
+			->alter_table( $this->table )
+			->drop_index( $from )
+			->add_index( $index )
+			->build();
 
-    /**
-     * Add a fulltext index to the table (MySQL only).
-     *
-     * @param string       $index_name The index name
-     * @param string|array $columns    Column or array of columns
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If not MySQL or operation fails
-     *
-     * @example
-     * $migration->index('posts')->addFulltext('content_fulltext', 'content');
-     */
-    public function addFulltext( string $index_name, $columns ) : self {
-        if ( 'mysql' !== $this->dbal->get_engine() ) {
-            throw new \Exception( 'FULLTEXT indexes are only supported in MySQL' );
-        }
+		$this->db->transactional( function () use ( $sql, $from, $to ) {
+			$this->run( $sql, sprintf( 'Renaming index "%s" to "%s" on table "%s"', $from, $to, $this->table ) );
+		} );
 
-        // Check if index already exists
-        if ( $this->exists( $index_name ) ) {
-            throw new \Exception( "Index '{$index_name}' already exists on table '{$this->table}'" );
-        }
+		return $this;
+	}
 
-        $columns = (array) $columns;
-        $sql = $this->sql_builder->add_index( $index_name, $columns, 'FULLTEXT' );
-        $this->dbal->exec( $sql );
+	/**
+	 * Drop an index.
+	 *
+	 * Does nothing when no index with this name exists.
+	 *
+	 * @param string $name The index name.
+	 * @return static
+	 * @throws MigrationException When the index cannot be dropped.
+	 */
+	public function drop( string $name ) : static {
+		if ( ! $this->exists( $name ) ) {
+			return $this;
+		}
 
-        return $this;
-    }
+		$sql = $this->query()
+			->alter_table( $this->table )
+			->drop_index( $name )
+			->build();
 
-    /**
-     * Drop an index from the table.
-     *
-     * @param string $index_name The index name
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If index doesn't exist or operation fails
-     *
-     * @example
-     * $migration->index('users')->drop('email_index');
-     */
-    public function drop( string $index_name ) : self {
-        // Check if index exists
-        if ( ! $this->exists( $index_name ) ) {
-            throw new \Exception( "Index '{$index_name}' does not exist on table '{$this->table}'" );
-        }
+		$this->run( $sql, sprintf( 'Dropping index "%s" on table "%s"', $name, $this->table ) );
 
-        $sql = $this->sql_builder->drop_index( $index_name );
-        $this->dbal->exec( $sql );
+		return $this;
+	}
 
-        return $this;
-    }
+	/**
+	 * Add an index unless one with the same name exists.
+	 *
+	 * Every column is checked before the index is created. SQLite reads a
+	 * quoted name that matches no column as a string, and would index that
+	 * constant instead of failing; checking first gives every engine the same
+	 * error.
+	 *
+	 * @param Constraint $index An 'index' or 'unique' definition with a name and columns.
+	 * @return static
+	 * @throws MigrationException When the table or a column does not exist, or the index cannot be created.
+	 */
+	private function add( Constraint $index ) : static {
+		if ( $this->exists( $index->name ) ) {
+			return $this;
+		}
 
-    /**
-     * Rename an index (if supported by database).
-     *
-     * Note: Not all databases support renaming indexes.
-     *
-     * @param string $old_name The old index name
-     * @param string $new_name The new index name
-     *
-     * @return self For method chaining
-     *
-     * @throws \Exception If not supported, index doesn't exist, or operation fails
-     *
-     * @example
-     * $migration->index('users')->rename('idx_old', 'idx_new');
-     */
-    public function rename( string $old_name, string $new_name ) : self {
-        $engine = $this->dbal->get_engine();
+		if ( ! $this->inspect()->table_exists( $this->table ) ) {
+			throw new MigrationException(
+				sprintf( 'Cannot create index "%s": table "%s" does not exist.', $index->name, $this->table )
+			);
+		}
 
-        // Check database support
-        if ( 'mysql' !== $engine ) {
-            throw new \Exception( "Renaming indexes is not supported in {$engine}" );
-        }
+		foreach ( $index->columns as $column ) {
+			if ( ! $this->inspect()->column_exists( $this->table, $column ) ) {
+				throw new MigrationException(
+					sprintf( 'Cannot create index "%s" on table "%s": column "%s" does not exist.', $index->name, $this->table, $column )
+				);
+			}
+		}
 
-        // Check if old index exists
-        if ( ! $this->exists( $old_name ) ) {
-            throw new \Exception( "Index '{$old_name}' does not exist on table '{$this->table}'" );
-        }
+		$sql = $this->query()
+			->alter_table( $this->table )
+			->add_index( $index )
+			->build();
 
-        // Check if new name doesn't exist
-        if ( $this->exists( $new_name ) ) {
-            throw new \Exception( "Index '{$new_name}' already exists on table '{$this->table}'" );
-        }
+		$this->run( $sql, sprintf( 'Creating index "%s" on table "%s"', $index->name, $this->table ) );
 
-        // MySQL: ALTER TABLE table RENAME INDEX old TO new
-        $sql = "ALTER TABLE {$this->table} RENAME INDEX {$old_name} TO {$new_name}";
-        $this->dbal->exec( $sql );
-
-        return $this;
-    }
-
-    /**
-     * Check if an index exists on the table.
-     *
-     * @param string $index_name The index name
-     *
-     * @return bool True if index exists
-     *
-     * @example
-     * if ($migration->index('users')->exists('email_index')) {
-     *     $migration->index('users')->drop('email_index');
-     * }
-     */
-    public function exists( string $index_name ) : bool {
-        $engine = $this->dbal->get_engine();
-
-        try {
-            switch ( $engine ) {
-                case 'mysql':
-                    $query = "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?";
-                    $result = $this->dbal->get_var( $query, [ $this->table, $index_name ] );
-                    return null !== $result;
-
-                case 'pgsql':
-                    $query = "SELECT 1 FROM pg_indexes WHERE tablename = ? AND indexname = ?";
-                    $result = $this->dbal->get_var( $query, [ $this->table, $index_name ] );
-                    return null !== $result;
-
-                case 'sqlite':
-                    $query = "SELECT 1 FROM sqlite_master WHERE type='index' AND name = ? AND tbl_name = ?";
-                    $result = $this->dbal->get_var( $query, [ $index_name, $this->table ] );
-                    return null !== $result;
-
-                default:
-                    return false;
-            }
-        } catch ( \Exception $e ) {
-            return false;
-        }
-    }
-
-    /**
-     * Get all indexes on the table.
-     *
-     * @return array Array of index names
-     *
-     * @example
-     * $indexes = $migration->index('users')->list();
-     * // Returns: ['PRIMARY', 'email_index', 'created_at_index']
-     */
-    public function list() : array {
-        $engine = $this->dbal->get_engine();
-
-        try {
-            switch ( $engine ) {
-                case 'mysql':
-                    $query = "SELECT index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? GROUP BY index_name";
-                    return $this->dbal->get_col( $query, [ $this->table ] );
-
-                case 'pgsql':
-                    $query = "SELECT indexname FROM pg_indexes WHERE tablename = ?";
-                    return $this->dbal->get_col( $query, [ $this->table ] );
-
-                case 'sqlite':
-                    $query = "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name = ?";
-                    return $this->dbal->get_col( $query, [ $this->table ] );
-
-                default:
-                    return [];
-            }
-        } catch ( \Exception $e ) {
-            return [];
-        }
-    }
+		return $this;
+	}
 }
