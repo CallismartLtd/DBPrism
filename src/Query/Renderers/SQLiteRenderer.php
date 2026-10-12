@@ -129,14 +129,45 @@ class SQLiteRenderer extends AbstractQueryRenderer {
      */
     public function render_alter_table( AlterTableIntent $intent ) : string {
         $table      = $this->quote_identifier( $intent->get_table_name() );
-        $operations = $intent->get_operations();
+        $operations = [];
+        $drops      = [];
+        $creates    = [];
+
+        foreach ( $intent->get_operations() as $op ) {
+            // SQLite has no index operations inside ALTER TABLE; indexes are
+            // standalone statements, as in render_create_table().
+            switch ( $this->index_operation( $op ) ) {
+                case 'ADD':
+                    $creates[] = $this->render_inline_index_as_create_index( $intent->get_table_name(), $op['payload'] );
+                    break;
+
+                case 'DROP':
+                    $drops[] = sprintf( "DROP INDEX %s;", $this->quote_identifier( $op['payload'] ) );
+                    break;
+
+                default:
+                    $operations[] = $op;
+            }
+        }
 
         // SQLite only supports one ALTER action at a time.
         if ( count( $operations ) > 1 ) {
             throw new \RuntimeException( "SQLite: Multiple ALTER operations are not supported in a single statement." );
         }
 
-        return sprintf( "ALTER TABLE %s %s;", $table, $this->render_alter_operation( $operations[0] ) );
+        if ( empty( $drops ) && empty( $creates ) ) {
+            return sprintf( "ALTER TABLE %s %s;", $table, $this->render_alter_operation( $operations[0] ) );
+        }
+
+        // Drops first: dropping a column in the same ALTER would fail while an index covers it.
+        // Creates last: an index may cover a column the ALTER adds.
+        $statements = $drops;
+
+        if ( ! empty( $operations ) ) {
+            $statements[] = sprintf( "ALTER TABLE %s %s;", $table, $this->render_alter_operation( $operations[0] ) );
+        }
+
+        return implode( "\n", array_merge( $statements, $creates ) );
     }
 
     /**
@@ -184,6 +215,7 @@ class SQLiteRenderer extends AbstractQueryRenderer {
     }
 
     protected function render_inline_index_as_create_index( string $table, Constraint $constraint ) : string {
+        $type  = 'unique' === strtolower( $constraint->type ) ? 'UNIQUE INDEX' : 'INDEX';
         $table = $this->quote_identifier( $table );
 
         $columns = implode( ', ', $this->quote_identifiers( $constraint->columns ) );
@@ -195,7 +227,8 @@ class SQLiteRenderer extends AbstractQueryRenderer {
             );
 
         return sprintf(
-            "CREATE INDEX %s ON %s (%s);",
+            "CREATE %s %s ON %s (%s);",
+            $type,
             $name,
             $table,
             $columns

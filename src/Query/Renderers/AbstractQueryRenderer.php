@@ -838,6 +838,39 @@ abstract class AbstractQueryRenderer {
     }
 
     /**
+     * Whether an ALTER TABLE operation adds or drops a plain index.
+     * 
+     * For engines that manage indexes with standalone CREATE INDEX and
+     * DROP INDEX statements rather than inside ALTER TABLE, as their
+     * render_create_table() already does for index constraints.
+     * 
+     * Indexes come from add_index(), or from add_constraint() with an
+     * 'index' constraint, which is an index on every engine.
+     * 
+     * @param array $op An operation from AlterTableIntent::get_operations().
+     * @return string|null 'ADD', 'DROP', or null for any other operation.
+     */
+    protected function index_operation( array $op ) : ?string {
+        $action  = strtoupper( $op['action'] );
+        $subject = strtoupper( $op['subject'] );
+
+        if ( 'ADD' === $action && 'INDEX' === $subject ) {
+            return 'ADD';
+        }
+
+        if ( 'ADD' === $action && 'CONSTRAINT' === $subject
+            && $op['payload'] instanceof Constraint && 'index' === strtolower( $op['payload']->type ) ) {
+            return 'ADD';
+        }
+
+        if ( 'DROP' === $action && 'INDEX' === $subject ) {
+            return 'DROP';
+        }
+
+        return null;
+    }
+
+    /**
      * Quote an array of identifiers.
      * 
      * @param array $identifiers

@@ -69,13 +69,12 @@ class MySQLRenderer extends AbstractQueryRenderer {
     public function render_create_index( CreateIndexIntent $intent ) : string {
         $table = $this->quote_identifier( $intent->get_table_name() );
         $index = $intent->get_index();
+        $type  = ( strtolower( $index->type ) === 'unique' ) ? 'UNIQUE INDEX' : 'INDEX';
+        $name  = $index->name ? $this->quote_identifier( $index->name ) : '';
+        $cols  = implode( ', ', $this->quote_identifiers( $index->columns ) );
 
-        return sprintf(
-            "CREATE %s ON %s (%s);",
-            $this->render_index_definition( $index ),
-            $table,
-            implode( ', ', $this->quote_identifiers( $index->columns ) )
-        );
+        // render_index_definition() includes the columns, for ADD INDEX; CREATE INDEX puts them after ON.
+        return trim( "CREATE {$type} {$name} ON {$table} ({$cols});" );
     }
 
     /**
@@ -167,6 +166,7 @@ class MySQLRenderer extends AbstractQueryRenderer {
             'DROP_CONSTRAINT' => $this->render_drop_constraint( $payload ),
 
             // Indexes
+            'ADD_INDEX'       => "ADD " . $this->render_index_definition( $payload ),
             'DROP_INDEX'      => "DROP INDEX " . $this->quote_identifier( $payload ),
 
             default => throw new \Exception( "MySQL: Unsupported operation {$action}_{$subject}" )
