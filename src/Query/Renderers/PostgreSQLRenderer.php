@@ -311,7 +311,7 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         $actions[] = "ALTER COLUMN {$name} " . ( $column->nullable ? "DROP NOT NULL" : "SET NOT NULL" );
 
         if ( $column->default !== null ) {
-            $actions[] = "ALTER COLUMN {$name} SET DEFAULT " . $this->format_value( $column->default );
+            $actions[] = "ALTER COLUMN {$name} SET DEFAULT " . $this->format_default( $column->default );
         }
 
         return implode( ', ', $actions );
@@ -343,7 +343,7 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         
         // If not serial, handle standard defaults
         if ( ! $column->auto_increment && $column->default !== null ) {
-            $parts[] = "DEFAULT " . $this->format_value( $column->default );
+            $parts[] = "DEFAULT " . $this->format_default( $column->default );
         }
 
         return implode( ' ', $parts );

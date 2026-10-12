@@ -215,7 +215,7 @@ class MySQLRenderer extends AbstractQueryRenderer {
         }
 
         if ( $column->default !== null ) {
-            $parts[] = "DEFAULT " . $this->format_value( $column->default );
+            $parts[] = "DEFAULT " . $this->format_default( $column->default );
         }
 
         if ( $column->auto_increment ) {
@@ -277,6 +277,22 @@ class MySQLRenderer extends AbstractQueryRenderer {
             LockMode::SKIP_LOCKED => ' FOR UPDATE SKIP LOCKED',
             default               => '',
         };
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * MySQL accepts the CURRENT_TIMESTAMP family (CURRENT_TIMESTAMP[(n)],
+     * NOW([n]), LOCALTIME[(n)], LOCALTIMESTAMP[(n)]) bare; that is the only
+     * expression default before MySQL 8.0.13, so it stays bare. Any other
+     * expression must be in parentheses (MySQL 8.0.13+, MariaDB 10.2+).
+     */
+    protected function wrap_default_expression( string $expression ) : string {
+        if ( preg_match( '/^\s*(CURRENT_TIMESTAMP|NOW|LOCALTIME|LOCALTIMESTAMP)\s*(\(\s*\d*\s*\))?\s*$/i', $expression ) ) {
+            return $expression;
+        }
+
+        return '(' . $expression . ')';
     }
 
     /**

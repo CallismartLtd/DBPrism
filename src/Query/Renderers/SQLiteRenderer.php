@@ -291,7 +291,7 @@ class SQLiteRenderer extends AbstractQueryRenderer {
         }
 
         if ( ! $column->nullable ) $parts[] = 'NOT NULL';
-        if ( $column->default !== null ) $parts[] = "DEFAULT " . $this->format_value( $column->default );
+        if ( $column->default !== null ) $parts[] = "DEFAULT " . $this->format_default( $column->default );
 
         return implode( ' ', $parts );
     }
@@ -325,6 +325,20 @@ class SQLiteRenderer extends AbstractQueryRenderer {
      */
     protected function render_lock_mode( LockMode $mode ) : string {
         return '';
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite accepts CURRENT_TIME, CURRENT_DATE and CURRENT_TIMESTAMP bare;
+     * any other expression must be in parentheses.
+     */
+    protected function wrap_default_expression( string $expression ) : string {
+        if ( preg_match( '/^\s*(CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)\s*$/i', $expression ) ) {
+            return $expression;
+        }
+
+        return '(' . $expression . ')';
     }
 
     /**

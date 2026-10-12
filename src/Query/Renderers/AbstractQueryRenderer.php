@@ -884,6 +884,57 @@ abstract class AbstractQueryRenderer {
     }
 
     /**
+     * Format a literal value: a boolean, NULL, a number or a quoted string.
+     *
+     * Unlike format_value(), a string is always quoted, never passed through
+     * as an expression.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    protected function format_literal( mixed $value ) : string {
+        return match( true ) {
+            is_bool( $value )    => $this->supports_native_booleans() ? ( $value ? 'TRUE' : 'FALSE' ) : ( $value ? '1' : '0' ),
+            is_null( $value )    => 'NULL',
+            is_int( $value ), is_float( $value ) => (string) $value,
+            default              => "'" . str_replace( "'", "''", (string) $value ) . "'"
+        };
+    }
+
+    /**
+     * Format a column's DEFAULT value.
+     *
+     * As format_value(), with an expression default passed through
+     * wrap_default_expression(), for engines that only accept some
+     * expressions in parentheses.
+     *
+     * @param mixed $value The column's default.
+     * @return string
+     */
+    protected function format_default( mixed $value ) : string {
+        $sql = $this->format_value( $value );
+
+        $is_expression = $value instanceof DefaultColumnValue
+            ? $value->is_expression()
+            : is_string( $value ) && ! static::is_single_quoted( trim( $value ) ) && static::is_sql_expression( $value );
+
+        return $is_expression ? $this->wrap_default_expression( $sql ) : $sql;
+    }
+
+    /**
+     * Write an expression DEFAULT the way this engine accepts it.
+     *
+     * Engines that need parentheses around some expressions override this;
+     * by default the expression is written as it is.
+     *
+     * @param string $expression The expression, as format_value() wrote it.
+     * @return string
+     */
+    protected function wrap_default_expression( string $expression ) : string {
+        return $expression;
+    }
+
+    /**
      * Quote a value as an SQL string literal, always.
      *
      * Unlike format_value(), never passes a value through as an expression:
@@ -963,7 +1014,8 @@ abstract class AbstractQueryRenderer {
                 return (string) $value;
             }
 
-            $value  = $value->value();
+            // Declared a literal: written as one, never read as an expression.
+            return $this->format_literal( $value->value() );
         }
         
         return match( true ) {
