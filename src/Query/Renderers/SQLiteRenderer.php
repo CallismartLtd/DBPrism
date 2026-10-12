@@ -72,8 +72,6 @@ class SQLiteRenderer extends AbstractQueryRenderer {
             if ( $skip_primary ) {
                 continue;
             }
-            // SQLite doesn't support named constraints in the same way; 
-            // usually handled within column definitions or as table constraints.
             $definitions[] = $this->render_constraint( $constraint );
         }
     
@@ -132,13 +130,18 @@ class SQLiteRenderer extends AbstractQueryRenderer {
         $operations = [];
         $drops      = [];
         $creates    = [];
+        $final_name = $intent->get_table_name();
 
         foreach ( $intent->get_operations() as $op ) {
+            if ( 'RENAME_TABLE' === strtoupper( $op['action'] ) . '_' . strtoupper( $op['subject'] ) ) {
+                $final_name = $op['payload']['to'];
+            }
+
             // SQLite has no index operations inside ALTER TABLE; indexes are
             // standalone statements, as in render_create_table().
             switch ( $this->index_operation( $op ) ) {
                 case 'ADD':
-                    $creates[] = $this->render_inline_index_as_create_index( $intent->get_table_name(), $op['payload'] );
+                    $creates[] = $op['payload']; // Rendered after the loop, against the final table name.
                     break;
 
                 case 'DROP':
@@ -154,6 +157,8 @@ class SQLiteRenderer extends AbstractQueryRenderer {
         if ( count( $operations ) > 1 ) {
             throw new \RuntimeException( "SQLite: Multiple ALTER operations are not supported in a single statement." );
         }
+
+        $creates = array_map( fn( $index ) => $this->render_inline_index_as_create_index( $final_name, $index ), $creates );
 
         if ( empty( $drops ) && empty( $creates ) ) {
             return sprintf( "ALTER TABLE %s %s;", $table, $this->render_alter_operation( $operations[0] ) );
@@ -197,6 +202,11 @@ class SQLiteRenderer extends AbstractQueryRenderer {
 
     /**
      * Render a constraint for SQLite.
+     *
+     * A named primary key, unique or foreign key constraint is written as
+     * CONSTRAINT "name" ..., which SQLite keeps in the table's stored
+     * definition: that stored definition is the only place SQLite records
+     * constraint names, and the only way to find a constraint by name later.
      * 
      * @param Constraint $constraint
      * @return string
@@ -204,10 +214,11 @@ class SQLiteRenderer extends AbstractQueryRenderer {
     protected function render_constraint( Constraint $constraint ) : string {
         $type    = strtolower( $constraint->type );
         $columns = implode( ', ', $this->quote_identifiers( $constraint->columns ) );
+        $name    = $constraint->name ? 'CONSTRAINT ' . $this->quote_identifier( $constraint->name ) . ' ' : '';
 
         return match ( $type ) {
-            'primary' => "PRIMARY KEY ({$columns})",
-            'unique'  => "UNIQUE ({$columns})",
+            'primary' => "{$name}PRIMARY KEY ({$columns})",
+            'unique'  => "{$name}UNIQUE ({$columns})",
             'foreign' => $this->render_foreign_key( $constraint ),
             'index'   => '', // Handled via standalone CREATE INDEX in SQLite
             default   => throw new \RuntimeException( "SQLite: Unsupported constraint type [{$type}]" )
@@ -261,11 +272,15 @@ class SQLiteRenderer extends AbstractQueryRenderer {
 
     /**
      * Render Column Definition for SQLite.
+     *
+     * SQLite has no column comments; Column::$comment is not rendered.
      * 
      * @param Column $column
      * @return string
      */
     protected function render_column_definition( Column $column ) : string {
+        $this->require_column_type( $column );
+
         $type = $this->normalize_type( $column->type );
 
         $parts = [ $this->quote_identifier( $column->name ), $type ];
@@ -294,7 +309,7 @@ class SQLiteRenderer extends AbstractQueryRenderer {
         $name    = $constraint->name ? $this->quote_identifier( $constraint->name ) : null;
 
         $sql    = $name ? "CONSTRAINT {$name} " : "";
-        $sql    = "FOREIGN KEY ({$columns}) REFERENCES {$ref_table} ({$ref_cols})";
+        $sql   .= "FOREIGN KEY ({$columns}) REFERENCES {$ref_table} ({$ref_cols})";
 
         if ( $constraint->on_delete ) $sql .= " ON DELETE " . strtoupper( $constraint->on_delete );
         if ( $constraint->on_update ) $sql .= " ON UPDATE " . strtoupper( $constraint->on_update );

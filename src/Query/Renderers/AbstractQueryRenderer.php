@@ -20,6 +20,7 @@ use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Utils\CaseExpression;
+use Callismart\DBPrism\Utils\Column;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\ColumnType;
 use Callismart\DBPrism\Utils\DefaultColumnValue;
@@ -835,6 +836,64 @@ abstract class AbstractQueryRenderer {
         }
 
         return $this->quote_single_identifier( $identifier );
+    }
+
+    /**
+     * Throw when a column has no type.
+     *
+     * Column::$type has no default, so a column built without ->type() would
+     * otherwise fail with PHP's "must not be accessed before initialization".
+     *
+     * @param Column $column
+     * @return void
+     * @throws \InvalidArgumentException When the column has no type.
+     */
+    protected function require_column_type( Column $column ) : void {
+        if ( ! isset( $column->type ) ) {
+            throw new \InvalidArgumentException(
+                sprintf( 'Column "%s" has no type; set one with Column::type().', $column->name )
+            );
+        }
+    }
+
+    /**
+     * The column a CREATE TABLE makes its primary key implicitly.
+     *
+     * Rule, the same on every engine: when the table declares no primary key,
+     * its auto-increment column becomes the primary key. (SQLite requires it;
+     * MySQL requires the column to be a key; PostgreSQL then matches both.)
+     *
+     * @param CreateTableIntent $intent
+     * @return string|null The auto-increment column's name, or null when the
+     *                     table declares a primary key or has no auto-increment column.
+     */
+    protected function implied_primary_key( CreateTableIntent $intent ) : ?string {
+        foreach ( $intent->get_constraints() as $constraint ) {
+            if ( 'primary' === strtolower( $constraint->type ) ) {
+                return null;
+            }
+        }
+
+        foreach ( $intent->get_columns() as $column ) {
+            if ( $column->auto_increment ) {
+                return $column->name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Quote a value as an SQL string literal, always.
+     *
+     * Unlike format_value(), never passes a value through as an expression:
+     * for text such as comments, where "count(x)" is words, not SQL.
+     *
+     * @param string $value
+     * @return string
+     */
+    protected function quote_string_literal( string $value ) : string {
+        return "'" . str_replace( "'", "''", $value ) . "'";
     }
 
     /**

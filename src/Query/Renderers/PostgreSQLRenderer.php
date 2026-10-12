@@ -76,6 +76,14 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
             $definitions[] = $this->render_constraint( $constraint );
         }
 
+        // An auto-increment (SERIAL) column becomes the primary key when the
+        // table declares none, as on MySQL and SQLite.
+        $implied_key = $this->implied_primary_key( $intent );
+
+        if ( null !== $implied_key ) {
+            $definitions[] = 'PRIMARY KEY (' . $this->quote_identifier( $implied_key ) . ')';
+        }
+
         // CREATE TABLE
         $table_sql = sprintf(
             "CREATE TABLE %s (\n\t%s\n);",
@@ -86,6 +94,13 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         // Append indexes (separate statements)
         if ( ! empty( $index_sql ) ) {
             $table_sql .= "\n\n" . implode( "\n", $index_sql );
+        }
+
+        // Column comments are separate statements in PostgreSQL.
+        $comment_sql = $this->render_column_comments( $intent->get_table_name(), $intent->get_columns() );
+
+        if ( ! empty( $comment_sql ) ) {
+            $table_sql .= "\n\n" . implode( "\n", $comment_sql );
         }
 
         return $table_sql;
@@ -139,13 +154,29 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         $operations = [];
         $drops      = [];
         $creates    = [];
+        $commented  = [];
+        $cleared    = [];
+        $final_name = $intent->get_table_name();
 
         foreach ( $intent->get_operations() as $op ) {
+            $key = strtoupper( $op['action'] ) . '_' . strtoupper( $op['subject'] );
+
+            // Comments on added or modified columns follow as separate statements,
+            // against the table's name after any rename in this same ALTER.
+            // A modified column without a comment has its old one removed, as MODIFY COLUMN does on MySQL.
+            if ( 'MODIFY_COLUMN' === $key && '' === $op['payload']->comment ) {
+                $cleared[] = $op['payload'];
+            } elseif ( 'ADD_COLUMN' === $key || 'MODIFY_COLUMN' === $key ) {
+                $commented[] = $op['payload'];
+            } elseif ( 'RENAME_TABLE' === $key ) {
+                $final_name = $op['payload']['to'];
+            }
+
             // PostgreSQL has no index operations inside ALTER TABLE; indexes are
             // standalone statements, as in render_create_table().
             switch ( $this->index_operation( $op ) ) {
                 case 'ADD':
-                    $creates[] = $this->render_inline_index_as_create_index( $intent->get_table_name(), $op['payload'] );
+                    $creates[] = $op['payload']; // Rendered after the loop, against the final table name.
                     break;
 
                 case 'DROP':
@@ -157,19 +188,30 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
             }
         }
 
-        if ( empty( $drops ) && empty( $creates ) ) {
+        $creates  = array_map( fn( $index ) => $this->render_inline_index_as_create_index( $final_name, $index ), $creates );
+        $comments = $this->render_column_comments( $final_name, $commented );
+
+        foreach ( $cleared as $column ) {
+            $comments[] = sprintf(
+                "COMMENT ON COLUMN %s.%s IS NULL;",
+                $this->quote_identifier( $final_name ),
+                $this->quote_identifier( $column->name )
+            );
+        }
+
+        if ( empty( $drops ) && empty( $creates ) && empty( $comments ) ) {
             return sprintf( "ALTER TABLE %s %s;", $table, implode( ', ', $operations ) );
         }
 
         // Drops first: dropping a column in the same ALTER also drops its indexes.
-        // Creates last: an index may cover a column the ALTER adds.
+        // Creates and comments last: they refer to columns the ALTER adds.
         $statements = $drops;
 
         if ( ! empty( $operations ) ) {
             $statements[] = sprintf( "ALTER TABLE %s %s;", $table, implode( ', ', $operations ) );
         }
 
-        return implode( "\n", array_merge( $statements, $creates ) );
+        return implode( "\n", array_merge( $statements, $creates, $comments ) );
     }
 
     /**
@@ -240,6 +282,8 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
      * @return string
      */
     private function render_pgsql_modify_column( Column $column ) : string {
+        $this->require_column_type( $column );
+
         $name = $this->quote_identifier( $column->name );
         $type = $this->normalize_type( $column->type, [
             'length' => $column->length,
@@ -247,7 +291,23 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
             'scale' => $column->scale
         ]);
 
-        $actions = [ "ALTER COLUMN {$name} TYPE {$type}" ];
+        // USING converts values PostgreSQL has no automatic cast for (e.g. text
+        // to integer); a value that cannot convert still fails the statement.
+        // Character types take no USING: an explicit cast to VARCHAR(n) would
+        // cut longer values short, where the automatic cast refuses them.
+        $using = preg_match( '/^\s*(VARCHAR|CHAR|CHARACTER|TEXT)\b/i', $type ) ? '' : " USING {$name}::{$type}";
+
+        $actions = [];
+
+        // The column gets exactly the default it is given, as MODIFY COLUMN
+        // does on MySQL. The old default goes first: PostgreSQL refuses a type
+        // change when the old default cannot be cast to the new type. An
+        // auto-increment column keeps its sequence default.
+        if ( ! $column->auto_increment ) {
+            $actions[] = "ALTER COLUMN {$name} DROP DEFAULT";
+        }
+
+        $actions[] = "ALTER COLUMN {$name} TYPE {$type}{$using}";
         $actions[] = "ALTER COLUMN {$name} " . ( $column->nullable ? "DROP NOT NULL" : "SET NOT NULL" );
 
         if ( $column->default !== null ) {
@@ -264,6 +324,8 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
      * @return string
      */
     protected function render_column_definition( Column $column ) : string {
+        $this->require_column_type( $column );
+
         $type = $this->normalize_type( $column->type, [
             'length'    => $column->length,
             'scale'     => $column->scale,
@@ -285,6 +347,34 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         }
 
         return implode( ' ', $parts );
+    }
+
+    /**
+     * COMMENT ON COLUMN statements for the columns that have a comment.
+     *
+     * An empty comment adds no statement.
+     *
+     * @param string   $table   Table name.
+     * @param Column[] $columns
+     * @return string[]
+     */
+    protected function render_column_comments( string $table, array $columns ) : array {
+        $statements = [];
+
+        foreach ( $columns as $column ) {
+            if ( '' === $column->comment ) {
+                continue;
+            }
+
+            $statements[] = sprintf(
+                "COMMENT ON COLUMN %s.%s IS %s;",
+                $this->quote_identifier( $table ),
+                $this->quote_identifier( $column->name ),
+                $this->quote_string_literal( $column->comment )
+            );
+        }
+
+        return $statements;
     }
 
     /**

@@ -56,6 +56,13 @@ class MySQLRenderer extends AbstractQueryRenderer {
             $definitions[] = $this->render_constraint( $constraint );
         }
 
+        // MySQL requires an AUTO_INCREMENT column to be a key.
+        $implied_key = $this->implied_primary_key( $intent );
+
+        if ( null !== $implied_key ) {
+            $definitions[] = 'PRIMARY KEY (' . $this->quote_identifier( $implied_key ) . ')';
+        }
+
         return sprintf( 
             "CREATE TABLE %s (\n\t%s\n)",
             $table_name,
@@ -188,6 +195,7 @@ class MySQLRenderer extends AbstractQueryRenderer {
      * Render Column Definition.
      */
     protected function render_column_definition( Column $column ) : string {
+        $this->require_column_type( $column );
 
         $parts = [
             $this->quote_identifier( $column->name ),
@@ -214,7 +222,24 @@ class MySQLRenderer extends AbstractQueryRenderer {
             $parts[] = 'AUTO_INCREMENT';
         }
 
+        if ( '' !== $column->comment ) {
+            $parts[] = 'COMMENT ' . $this->quote_mysql_comment( $column->comment );
+        }
+
         return implode( ' ', $parts );
+    }
+
+    /**
+     * Quote a column comment for MySQL.
+     *
+     * MySQL also treats a backslash as an escape inside strings (unless the
+     * NO_BACKSLASH_ESCAPES SQL mode is on), so backslashes are doubled too.
+     *
+     * @param string $comment
+     * @return string
+     */
+    private function quote_mysql_comment( string $comment ) : string {
+        return $this->quote_string_literal( str_replace( '\\', '\\\\', $comment ) );
     }
 
     /**
