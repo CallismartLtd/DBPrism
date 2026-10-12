@@ -46,9 +46,7 @@ class WPDBAdapter implements DatabaseAdapterInterface {
     /**
      * Constructor. 
      *
-     * Initializes the adapter with the global $wpdb instance.
-     *
-     * @param wpdb $wpdb Optional. Custom wpdb instance. Defaults to global $wpdb.
+     * @param wpdb $wpdb
      */
     public function __construct( $wpdb ) {
         $this->wpdb = $wpdb;
@@ -59,6 +57,13 @@ class WPDBAdapter implements DatabaseAdapterInterface {
      */
     public function __destruct() {
         $this->close();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function  connect(): bool {
+        return $this->wpdb->db_connect();
     }
 
     /**
