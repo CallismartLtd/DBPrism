@@ -99,6 +99,8 @@ class MigrationLedger {
 	 * @throws MigrationException When a table cannot be created.
 	 */
 	public function ensure() : void {
+		$this->require_database();
+
 		( new TableOperator( $this->db, $this->table ) )->create( function ( $table ) {
 			$table
 				->add_column( Column::make( 'id' )->type( ColumnType::INTEGER )->auto_increment() )
@@ -125,6 +127,8 @@ class MigrationLedger {
 	 *                            unreachable: that is not the same as "nothing applied".
 	 */
 	public function exists() : bool {
+		$this->require_database();
+
 		if ( ( new Inspector( $this->db ) )->table_exists( $this->table ) ) {
 			return true;
 		}
@@ -210,6 +214,21 @@ class MigrationLedger {
 			throw new MigrationException(
 				sprintf( 'Removing the record of migration "%s" failed: %s', $migration, $this->db->get_last_error() ?? 'unknown error' )
 			);
+		}
+	}
+
+	/**
+	 * Throw when no database is configured yet.
+	 *
+	 * Checked on each use rather than once, because Database::set_adapter()
+	 * can replace the placeholder adapter at any time.
+	 *
+	 * @return void
+	 * @throws MigrationException When the Database holds the NullDBAdapter placeholder.
+	 */
+	private function require_database() : void {
+		if ( $this->db->has_null_adapter() ) {
+			throw new MigrationException( 'Migrations cannot run: no database is configured yet.' );
 		}
 	}
 
