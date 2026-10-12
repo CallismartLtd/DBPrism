@@ -142,6 +142,19 @@ interface InspectionInterface {
 	public function get_primary_key( string $table ): ?array;
 
 	/**
+	 * Get the name of a table's primary key constraint.
+	 *
+	 * The name the engine drops the primary key by: PRIMARY on MySQL; the
+	 * constraint name on PostgreSQL (<table>_pkey unless another was given);
+	 * the CONSTRAINT name written in the table definition on SQLite.
+	 *
+	 * @param string $table Table name.
+	 * @return string|null The name, or null if the table has no primary key
+	 *                     or (on SQLite) it was declared without a name.
+	 */
+	public function get_primary_key_name( string $table ): ?string;
+
+	/**
 	 * Get all foreign key constraints for a table.
 	 *
 	 * @param string $table Table name.

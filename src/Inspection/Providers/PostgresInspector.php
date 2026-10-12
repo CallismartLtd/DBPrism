@@ -106,7 +106,7 @@ class PostgresInspector extends AbstractInspector {
 			"SELECT 
 				c.column_name,
 				c.udt_name as column_type,
-				c.is_nullable,
+				( c.is_nullable = 'YES' ) as is_nullable,
 				c.column_default,
 				CASE WHEN pg_get_serial_sequence(t.table_name, c.column_name) IS NOT NULL THEN true ELSE false END as is_auto_increment
 			FROM information_schema.columns c
@@ -119,40 +119,65 @@ class PostgresInspector extends AbstractInspector {
 
 	/**
 	 * Get indexes.
+	 *
+	 * Columns are listed in index order (their position in pg_index.indkey),
+	 * and the primary key's index is left out. Expression columns have no
+	 * column name and are not listed.
 	 */
 	protected function sql_indexes( string $table ): string {
 		return sprintf(
 			"SELECT 
-				i.indexname as index_name,
-				a.attname as column_name,
-				NOT ix.indisunique as is_unique,
-				a.attnum as seq_in_index
-			FROM pg_indexes pi
-			JOIN pg_class t ON t.relname = pi.tablename
-			JOIN pg_class i ON i.relname = pi.indexname
-			JOIN pg_index ix ON ix.indexrelid = i.oid
-			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
-			WHERE pi.schemaname = 'public' AND pi.tablename = '%s' AND pi.indexname NOT LIKE '%%_pkey'
-			ORDER BY pi.indexname, a.attnum",
+				i.relname AS index_name,
+				a.attname AS column_name,
+				ix.indisunique AS is_unique,
+				k.ord AS seq_in_index
+			FROM pg_index ix
+			JOIN pg_class t ON t.oid = ix.indrelid
+			JOIN pg_namespace n ON n.oid = t.relnamespace
+			JOIN pg_class i ON i.oid = ix.indexrelid
+			JOIN unnest( ix.indkey ) WITH ORDINALITY AS k( attnum, ord ) ON true
+			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+			WHERE n.nspname = 'public' AND t.relname = '%s' AND NOT ix.indisprimary
+			ORDER BY i.relname, k.ord",
 			addslashes( $table )
 		);
 	}
 
 	/**
 	 * Get primary key.
+	 *
+	 * Columns are listed in key order.
 	 */
 	protected function sql_primary_key( string $table ): string {
 		return sprintf(
 			"SELECT 
-				a.attname as column_name,
-				a.attnum as seq_in_index
-			FROM pg_index i
-			JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-			JOIN pg_class t ON t.oid = i.indrelid
-			WHERE i.indisprimary AND t.relname = '%s'
-			ORDER BY a.attnum",
+				a.attname AS column_name,
+				k.ord AS seq_in_index
+			FROM pg_index ix
+			JOIN pg_class t ON t.oid = ix.indrelid
+			JOIN pg_namespace n ON n.oid = t.relnamespace
+			JOIN unnest( ix.indkey ) WITH ORDINALITY AS k( attnum, ord ) ON true
+			JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+			WHERE ix.indisprimary AND n.nspname = 'public' AND t.relname = '%s'
+			ORDER BY k.ord",
 			addslashes( $table )
 		);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function get_primary_key_name( string $table ): ?string {
+		$name = $this->dbal->get_var(
+			"SELECT c.conname FROM pg_constraint c
+			JOIN pg_class t ON t.oid = c.conrelid
+			JOIN pg_namespace n ON n.oid = t.relnamespace
+			WHERE c.contype = 'p' AND n.nspname = 'public' AND t.relname = ?
+			LIMIT 1",
+			[ $table ]
+		);
+
+		return is_string( $name ) && '' !== $name ? $name : null;
 	}
 
 	/**

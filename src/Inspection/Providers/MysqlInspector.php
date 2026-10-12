@@ -195,6 +195,15 @@ class MysqlInspector extends AbstractInspector {
 	}
 
 	/**
+	 * {@inheritdoc}
+	 *
+	 * MySQL always names the primary key PRIMARY.
+	 */
+	public function get_primary_key_name( string $table ): ?string {
+		return null === $this->get_primary_key( $table ) ? null : 'PRIMARY';
+	}
+
+	/**
 	 * Get foreign keys.
 	 */
 	protected function sql_foreign_keys( string $table ): string {

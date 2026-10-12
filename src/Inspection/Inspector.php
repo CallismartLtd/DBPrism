@@ -54,6 +54,9 @@ use Callismart\DBPrism\Inspection\Providers\SQLiteInspector;
  * @method static array|null get_primary_key(string $table)
  *     Get primary key column(s) for a table.
  *
+ * @method static string|null get_primary_key_name(string $table)
+ *     Get the name of a table's primary key constraint.
+ *
  * @method static array get_foreign_keys(string $table)
  *     Get all foreign key constraints for a table.
  *

@@ -8,6 +8,9 @@
 
 namespace Callismart\DBPrism\Inspection\Providers;
 
+use Callismart\DBPrism\Migrations\SQLite\TableDefinition;
+use InvalidArgumentException;
+
 /**
  * Inspector for SQLite databases.
  * 
@@ -82,8 +85,58 @@ class SQLiteInspector extends AbstractInspector {
 	}
 
     protected function pragma_table_info( string $table ) : string {
-        return sprintf( 'PRAGMA table_info(%s)', $table );
+        return sprintf( 'PRAGMA table_info(%s)', $this->quote_identifier( $table ) );
     }
+
+	/**
+	 * Quote an identifier for use in a PRAGMA argument.
+	 *
+	 * Unquoted, a name that is an SQL keyword (e.g. "order") or contains
+	 * other characters is a syntax error, and the PRAGMA returns nothing.
+	 *
+	 * @param string $identifier The identifier.
+	 * @return string
+	 */
+	protected function quote_identifier( string $identifier ) : string {
+		return '"' . str_replace( '"', '""', $identifier ) . '"';
+	}
+
+	/**
+	 * The table's stored CREATE TABLE statement, read as a definition.
+	 *
+	 * SQLite records constraint names only in this statement; PRAGMA
+	 * foreign_key_list and index_list do not report them.
+	 *
+	 * @param string $table Table name.
+	 * @return TableDefinition|null Null when the table does not exist or its statement cannot be read.
+	 */
+	protected function table_definition( string $table ) : ?TableDefinition {
+		$sql = $this->dbal->get_var(
+			"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ? COLLATE NOCASE",
+			[ $table ]
+		);
+
+		if ( ! is_string( $sql ) || '' === $sql ) {
+			return null;
+		}
+
+		try {
+			return TableDefinition::from_sql( $sql );
+		} catch ( InvalidArgumentException $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Whether two lists of identifiers are the same, ignoring ASCII case as SQLite does.
+	 *
+	 * @param string[] $a
+	 * @param string[] $b
+	 * @return bool
+	 */
+	protected function same_identifiers( array $a, array $b ) : bool {
+		return array_map( 'strtolower', array_values( $a ) ) === array_map( 'strtolower', array_values( $b ) );
+	}
 
 	/**
 	 * Override column_exists for SQLite (since PRAGMA returns structured data).
@@ -136,10 +189,15 @@ class SQLiteInspector extends AbstractInspector {
 
 	/**
 	 * Override get_column_details to use PRAGMA.
+	 *
+	 * A column is reported as auto-increment when it is declared
+	 * AUTOINCREMENT. A plain INTEGER PRIMARY KEY, which reuses the highest
+	 * value after rows are deleted, is not.
 	 */
 	public function get_column_details( string $table ): array {
-		$rows    = $this->execute_query( $this->pragma_table_info( $table ) );
-		$details = array();
+		$rows       = $this->execute_query( $this->pragma_table_info( $table ) );
+		$definition = $this->table_definition( $table );
+		$details    = array();
 
 		foreach ( $rows as $col_info ) {
 			$column_name = $col_info['name'];
@@ -147,7 +205,8 @@ class SQLiteInspector extends AbstractInspector {
 				'type'           => $this->normalize_type( $col_info['type'] ),
 				'nullable'       => $col_info['notnull'] == 0,
 				'default'        => $col_info['dflt_value'] ?? null,
-				'auto_increment' => (bool) $col_info['pk'],
+				// Declared AUTOINCREMENT, as the renderer writes an auto-increment column.
+				'auto_increment' => null !== $definition && $definition->is_autoincrement_column( $column_name ),
 			);
 		}
 
@@ -188,7 +247,7 @@ class SQLiteInspector extends AbstractInspector {
 	 * Get indexes.
 	 */
 	protected function sql_indexes( string $table ): string {
-		return sprintf( 'PRAGMA index_list(%s)', $table );
+		return sprintf( 'PRAGMA index_list(%s)', $this->quote_identifier( $table ) );
 	}
 
 	/**
@@ -205,7 +264,7 @@ class SQLiteInspector extends AbstractInspector {
 			}
 
 			$index_name  = $idx['name'];
-			$index_info  = $this->execute_query( sprintf( 'PRAGMA index_info(%s)', $index_name ) );
+			$index_info  = $this->execute_query( sprintf( 'PRAGMA index_info(%s)', $this->quote_identifier( $index_name ) ) );
 			$columns     = array();
 
 			foreach ( $index_info as $col_info ) {
@@ -262,36 +321,76 @@ class SQLiteInspector extends AbstractInspector {
 	}
 
 	/**
+	 * {@inheritdoc}
+	 *
+	 * Read from the table's stored definition: the CONSTRAINT name of its
+	 * PRIMARY KEY, when one was written.
+	 */
+	public function get_primary_key_name( string $table ): ?string {
+		if ( null === $this->get_primary_key( $table ) ) {
+			return null;
+		}
+
+		return $this->table_definition( $table )?->get_primary_key_name();
+	}
+
+	/**
 	 * Get foreign keys.
 	 */
 	protected function sql_foreign_keys( string $table ): string {
-		return sprintf( 'PRAGMA foreign_key_list(%s)', $table );
+		return sprintf( 'PRAGMA foreign_key_list(%s)', $this->quote_identifier( $table ) );
 	}
 
 	/**
 	 * Override get_foreign_keys to use PRAGMA.
+	 *
+	 * Each key is named as it was declared (CONSTRAINT name FOREIGN KEY ...),
+	 * matched to the PRAGMA row by its columns and referenced table. A key
+	 * declared without a name, or inside a column definition, keeps the
+	 * name fk_<id>, where <id> is the PRAGMA's id for it.
 	 */
 	public function get_foreign_keys( string $table ): array {
-		$fk_list = $this->execute_query( sprintf( 'PRAGMA foreign_key_list(%s)', $table ) );
-		$fks     = array();
+		$fk_list = $this->execute_query( $this->sql_foreign_keys( $table ) );
+		$grouped = array();
 
 		foreach ( $fk_list as $fk ) {
 			// SQLite PRAGMA returns: id, seq, table, from, to, on_update, on_delete, match
-			$constraint_id    = 'fk_' . $fk['id'];
-			$referenced_col   = $fk['to'];
-			$referenced_table = $fk['table'];
-			$column_name      = $fk['from'];
+			$id = (int) $fk['id'];
 
-			if ( ! isset( $fks[ $constraint_id ] ) ) {
-				$fks[ $constraint_id ] = array(
+			if ( ! isset( $grouped[ $id ] ) ) {
+				$grouped[ $id ] = array(
 					'columns'            => array(),
-					'referenced_table'   => $referenced_table,
+					'referenced_table'   => $fk['table'],
 					'referenced_columns' => array(),
 				);
 			}
 
-			$fks[ $constraint_id ]['columns'][]            = $column_name;
-			$fks[ $constraint_id ]['referenced_columns'][] = $referenced_col;
+			$grouped[ $id ]['columns'][]            = $fk['from'];
+			$grouped[ $id ]['referenced_columns'][] = $fk['to'];
+		}
+
+		$declared = array_filter(
+			$this->table_definition( $table )?->get_constraints() ?? array(),
+			fn( $constraint ) => 'foreign' === $constraint['type'] && null !== $constraint['name']
+		);
+
+		$fks = array();
+
+		foreach ( $grouped as $id => $fk ) {
+			$name = 'fk_' . $id;
+
+			foreach ( $declared as $i => $constraint ) {
+				if (
+					$this->same_identifiers( $constraint['columns'], $fk['columns'] )
+					&& 0 === strcasecmp( (string) $constraint['references_table'], (string) $fk['referenced_table'] )
+				) {
+					$name = $constraint['name'];
+					unset( $declared[ $i ] );
+					break;
+				}
+			}
+
+			$fks[ $name ] = $fk;
 		}
 
 		return $fks;
@@ -308,26 +407,46 @@ class SQLiteInspector extends AbstractInspector {
 
 	/**
 	 * Get unique constraints.
-	 * 
+	 *
 	 * SQLite doesn't provide direct access to unique constraints via PRAGMA.
-	 * We retrieve them from the index list.
+	 * We retrieve them from the index list: unique indexes, and the
+	 * automatic indexes behind UNIQUE constraints. A UNIQUE constraint
+	 * declared with a name (CONSTRAINT name UNIQUE (...)) is listed under
+	 * that name, matched by its columns; one declared without a name keeps
+	 * its automatic index name (sqlite_autoindex_<table>_<n>).
 	 */
 	public function get_unique_constraints( string $table ): array {
 		$index_list   = $this->execute_query( $this->sql_indexes( $table ) );
 		$constraints  = array();
+		$declared     = null;
 
 		foreach ( $index_list as $idx ) {
 			// Only include unique indexes that aren't primary key
-			if ( ! $idx['unique'] || $idx['unique'] == 2 ) {
+			if ( ! $idx['unique'] || 'pk' === ( $idx['origin'] ?? '' ) ) {
 				continue;
 			}
 
 			$index_name  = $idx['name'];
-			$index_info  = $this->execute_query( sprintf( 'PRAGMA index_info(%s)', $index_name ) );
+			$index_info  = $this->execute_query( sprintf( 'PRAGMA index_info(%s)', $this->quote_identifier( $index_name ) ) );
 			$columns     = array();
 
 			foreach ( $index_info as $col_info ) {
 				$columns[] = $col_info['name'];
+			}
+
+			if ( 'u' === ( $idx['origin'] ?? '' ) ) {
+				$declared ??= array_filter(
+					$this->table_definition( $table )?->get_constraints() ?? array(),
+					fn( $constraint ) => 'unique' === $constraint['type'] && null !== $constraint['name']
+				);
+
+				foreach ( $declared as $i => $constraint ) {
+					if ( $this->same_identifiers( $constraint['columns'], $columns ) ) {
+						$index_name = $constraint['name'];
+						unset( $declared[ $i ] );
+						break;
+					}
+				}
 			}
 
 			$constraints[ $index_name ] = $columns;
