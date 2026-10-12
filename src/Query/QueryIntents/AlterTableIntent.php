@@ -15,6 +15,7 @@ use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Utils\Column;
 use Callismart\DBPrism\Utils\Constraint;
 use Exception;
+use InvalidArgumentException;
 
 /**
  * Represents an intent to alter an existing database table.
@@ -82,7 +83,8 @@ class AlterTableIntent {
         ];
 
         if ( $constraint ) {
-            // If the constraint hasn't had columns assigned, default to this column.
+            // If the constraint hasn't had columns assigned,
+            // default to this column.
             if ( empty( $constraint->columns ) ) {
                 $constraint->on( $column->name );
             }
@@ -183,6 +185,38 @@ class AlterTableIntent {
             'action'  => 'DROP',
             'subject' => 'CONSTRAINT',
             'payload' => $constraint_name,
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Add an index operation.
+     * 
+     * The counterpart of drop_index(): an index added here, plain or unique,
+     * is an index on every engine and is removed with drop_index(). A UNIQUE
+     * constraint, removed with drop_constraint(), is added with add_constraint().
+     * 
+     * @param Constraint $index An 'index' or 'unique' definition, e.g.
+     *                          Constraint::index( 'name' )->on( 'column' ).
+     * @return static
+     * @throws InvalidArgumentException When it is not an index, or has no columns.
+     */
+    public function add_index( Constraint $index ) : static {
+        if ( ! in_array( $index->type, [ 'index', 'unique' ], true ) ) {
+            throw new InvalidArgumentException(
+                sprintf( 'add_index() expects an index or unique constraint, [%s] given.', $index->type )
+            );
+        }
+
+        if ( empty( $index->columns ) ) {
+            throw new InvalidArgumentException( 'add_index() expects at least one column.' );
+        }
+
+        $this->operations[] = [
+            'action'  => 'ADD',
+            'subject' => 'INDEX',
+            'payload' => $index,
         ];
 
         return $this;
