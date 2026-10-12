@@ -14,6 +14,7 @@ use Callismart\DBPrism\Exceptions\MigrationException;
 use Callismart\DBPrism\Exceptions\MigrationLockedException;
 use Callismart\DBPrism\Inspection\Inspector;
 use Callismart\DBPrism\Migrations\Operators\TableOperator;
+use Callismart\DBPrism\Query\SQLBuilder;
 use Callismart\DBPrism\Utils\Column;
 use Callismart\DBPrism\Utils\ColumnType;
 use Callismart\DBPrism\Utils\Constraint;
@@ -149,7 +150,12 @@ class MigrationLedger {
 
 		$applied = [];
 
-		foreach ( $this->db->get_results( 'SELECT migration, run, applied_at FROM ' . $this->table . ' ORDER BY id' ) as $row ) {
+		$query = $this->query()
+			->select( 'migration', 'run', 'applied_at' )
+			->from( $this->table )
+			->order_by( 'id' );
+
+		foreach ( $this->db->get_results( $query->build(), $query->get_bindings() ) as $row ) {
 			$applied[ $row['migration'] ] = [
 				'run'        => (int) $row['run'],
 				'applied_at' => (string) $row['applied_at'],
@@ -207,6 +213,15 @@ class MigrationLedger {
 		}
 	}
 
+	/**
+	 * Start building a query in the dialect of the database.
+	 *
+	 * @return SQLBuilder
+	 */
+	private function query() : SQLBuilder {
+		return new SQLBuilder( $this->db->get_driver() );
+	}
+
 	/*
 	|------
 	| Lock
@@ -225,7 +240,12 @@ class MigrationLedger {
 	 * @throws MigrationException       When the lock cannot be read or written.
 	 */
 	public function lock( int $expires_after ) : void {
-		$held = $this->db->get_row( 'SELECT owner, acquired_at FROM ' . $this->lock_table . ' WHERE id = 1' );
+		$query = $this->query()
+			->select( 'owner', 'acquired_at' )
+			->from( $this->lock_table )
+			->where( 'id', '=', 1 );
+
+		$held = $this->db->get_row( $query->build(), $query->get_bindings() );
 
 		if ( null !== $held ) {
 			$age = time() - (int) $held['acquired_at'];
