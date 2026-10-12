@@ -80,8 +80,9 @@ final class SQLStatementSplitterTest extends TestCase {
 	}
 
 	public function test_mysql_hash_comment_with_semicolon(): void {
+		// "#" starts a comment only in MySQL: PostgreSQL reads it as XOR, SQLite rejects it.
 		$sql = "SELECT 1; # comment; with semicolon\nSELECT 2;";
-		$result = $this->splitter->split( $sql );
+		$result = ( new SQLStatementSplitter( SQLStatementSplitter::DIALECT_MYSQL ) )->split( $sql );
 
 		$this->assertCount( 2, $result );
 		$this->assertSame( 'SELECT 1', $result[0] );
@@ -259,7 +260,8 @@ final class SQLStatementSplitterTest extends TestCase {
 		SELECT 2; # hash comment
 		SELECT 3; /* block comment */
 		SQL;
-		$result = $this->splitter->split( $sql );
+		// The "#" comment makes this MySQL-only.
+		$result = ( new SQLStatementSplitter( SQLStatementSplitter::DIALECT_MYSQL ) )->split( $sql );
 
 		$this->assertCount( 3, $result );
 		$this->assertSame( 'SELECT 1', $result[0] );
