@@ -14,6 +14,7 @@ use mysqli_stmt;
 use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
+use Callismart\DBPrism\Utils\ParamType;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use mysqli_sql_exception;
 use Throwable;
@@ -200,6 +201,15 @@ class MysqliAdapter implements StreamingAdapterInterface {
     protected function query( string $query, array $params = [] ) : mysqli_stmt|false {
         $this->last_error = null;
 
+        // A value that cannot be bound throws here, before anything is sent.
+        $types  = '';
+        $values = [];
+
+        foreach ( array_values( $params ) as $param ) {
+            $types   .= $this->get_bind_type( $param );
+            $values[] = $this->get_bind_value( $param );
+        }
+
         try {
             if ( ! $this->ensure_connection() ) {
                 return false;
@@ -212,10 +222,8 @@ class MysqliAdapter implements StreamingAdapterInterface {
                 return false;
             }
 
-            if ( ! empty( $params ) ) {
-                $types = $this->get_bind_types( $params );
-
-                if ( ! $stmt->bind_param( $types, ...$params ) ) {
+            if ( ! empty( $values ) ) {
+                if ( ! $stmt->bind_param( $types, ...$values ) ) {
                     $this->last_error = 'Bind param failed: ' . $stmt->error;
                     $stmt->close();
                     return false;
@@ -255,25 +263,35 @@ class MysqliAdapter implements StreamingAdapterInterface {
     }
 
     /**
-     * Generate bind_param type string from parameter values.
-     * 
-     * @param array $params Array of parameters.
-     * @return string String of types (i = integer, d = double, s = string, b = blob).
+     * The bind_param() type character for a value.
+     *
+     * @param mixed $value Value to bind.
+     * @return string i, d or s.
+     * @throws \InvalidArgumentException When the value cannot be bound.
      */
-    protected function get_bind_types( array $params ) : string {
-        $types = '';
+    protected function get_bind_type( mixed $value ) : string {
+        return match ( ParamType::of( $value ) ) {
+            ParamType::BOOL, ParamType::INT => 'i',
+            ParamType::FLOAT                => 'd',
+            ParamType::NULL,
+            ParamType::STRING,
+            ParamType::BINARY               => 's',
+        };
+    }
 
-        foreach ( $params as $param ) {
-            if ( is_int( $param ) ) {
-                $types .= 'i';
-            } elseif ( is_float( $param ) ) {
-                $types .= 'd';
-            } else {
-                $types .= 's';
-            }
-        }
-
-        return $types;
+    /**
+     * The value to pass to bind_param().
+     *
+     * A binary stream is sent as its bytes: mysqli strings are binary-safe.
+     * Booleans are converted by their "i" type.
+     *
+     * @param mixed $value Value to bind.
+     * @return mixed
+     * @throws \InvalidArgumentException When the value cannot be bound.
+     * @throws \RuntimeException         When a binary stream cannot be read.
+     */
+    protected function get_bind_value( mixed $value ) : mixed {
+        return ParamType::BINARY === ParamType::of( $value ) ? ParamType::read_stream( $value ) : $value;
     }
 
     /**

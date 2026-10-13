@@ -18,6 +18,7 @@ use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use Callismart\DBPrism\Utils\DsnBuilder;
+use Callismart\DBPrism\Utils\ParamType;
 use Callismart\DBPrism\Utils\SQLStatementSplitter;
 
 /**
@@ -212,6 +213,13 @@ class PdoAdapter implements StreamingAdapterInterface {
     protected function query( $query, array $params = [] ) : PDOStatement|false {
         $this->last_error = null;
 
+        // A value that cannot be bound throws here, before anything is sent.
+        $bindings = [];
+
+        foreach ( array_values( $params ) as $param ) {
+            $bindings[] = [ $this->get_bind_value( $param ), $this->get_bind_type( $param ) ];
+        }
+
         if ( ! $this->ensure_connection() ) {
             return false;
         }
@@ -224,12 +232,9 @@ class PdoAdapter implements StreamingAdapterInterface {
                 return false;
             }
 
-            if ( ! empty( $params ) ) {
-                foreach ( $params as $i => $param ) {
-                    $type = $this->get_param_type( $param );
-                    // PDO uses 1-based indices for positional placeholders
-                    $stmt->bindValue( $i + 1, $param, $type );
-                }
+            foreach ( $bindings as $i => [ $value, $type ] ) {
+                // PDO uses 1-based indices for positional placeholders.
+                $stmt->bindValue( $i + 1, $value, $type );
             }
 
             $stmt->execute();
@@ -295,21 +300,59 @@ class PdoAdapter implements StreamingAdapterInterface {
     }
 
     /**
-     * Determine the PDO parameter type for a value.
+     * The PDO::PARAM_* type for a value.
      *
-     * @param mixed $param The parameter value.
-     * @return int PDO::PARAM_* constant.
+     * @param mixed $value Value to bind.
+     * @return int
+     * @throws \InvalidArgumentException When the value cannot be bound.
      */
-    protected function get_param_type( $param ) : int {
-        if ( is_null( $param ) ) {
-            return PDO::PARAM_NULL;
-        } elseif ( is_bool( $param ) ) {
-            return PDO::PARAM_BOOL;
-        } elseif ( is_int( $param ) ) {
-            return PDO::PARAM_INT;
-        } else {
-            return PDO::PARAM_STR;
-        }
+    protected function get_bind_type( mixed $value ) : int {
+        return match ( ParamType::of( $value ) ) {
+            ParamType::NULL   => PDO::PARAM_NULL,
+            ParamType::BOOL   => PDO::PARAM_BOOL,
+            ParamType::INT    => PDO::PARAM_INT,
+            ParamType::FLOAT,
+            ParamType::STRING => PDO::PARAM_STR,
+            ParamType::BINARY => PDO::PARAM_LOB,
+        };
+    }
+
+    /**
+     * The value to pass to bindValue().
+     *
+     * PDO has no float type: a float is sent as the shortest string that
+     * reads back as the same number, instead of PHP's 14-digit conversion.
+     * A binary stream is passed as is; PDO reads it for PARAM_LOB.
+     *
+     * @param mixed $value Value to bind.
+     * @return mixed
+     * @throws \InvalidArgumentException When the value cannot be bound.
+     */
+    protected function get_bind_value( mixed $value ) : mixed {
+        return ParamType::FLOAT === ParamType::of( $value ) ? ParamType::float_to_string( $value ) : $value;
+    }
+
+    /**
+     * Convert a fetched row's stream values to strings.
+     *
+     * Drivers such as pdo_pgsql return binary columns (BYTEA) as streams;
+     * every adapter returns them as strings.
+     *
+     * @param array $row Fetched row.
+     * @return array
+     */
+    protected function read_row( array $row ) : array {
+        return array_map( [ $this, 'read_value' ], $row );
+    }
+
+    /**
+     * Convert a fetched stream value to a string; other values are returned as they are.
+     *
+     * @param mixed $value Fetched value.
+     * @return mixed
+     */
+    protected function read_value( mixed $value ) : mixed {
+        return ParamType::is_stream( $value ) ? ParamType::read_stream( $value ) : $value;
     }
 
     /**
@@ -328,7 +371,7 @@ class PdoAdapter implements StreamingAdapterInterface {
         }
         
         $row = $stmt->fetch( PDO::FETCH_ASSOC );
-        return $row ?: null;
+        return $row ? $this->read_row( $row ) : null;
     }
 
     /**
@@ -346,7 +389,7 @@ class PdoAdapter implements StreamingAdapterInterface {
             return [];
         }
         
-        return $stmt->fetchAll( PDO::FETCH_ASSOC );
+        return array_map( [ $this, 'read_row' ], $stmt->fetchAll( PDO::FETCH_ASSOC ) );
     }
 
     /**
@@ -365,7 +408,7 @@ class PdoAdapter implements StreamingAdapterInterface {
         }
         
         $value = $stmt->fetchColumn();
-        return $value !== false ? $value : null;
+        return $value !== false ? $this->read_value( $value ) : null;
     }
 
     /**
@@ -383,7 +426,7 @@ class PdoAdapter implements StreamingAdapterInterface {
             return [];
         }
         
-        return $stmt->fetchAll( PDO::FETCH_COLUMN, 0 );
+        return array_map( [ $this, 'read_value' ], $stmt->fetchAll( PDO::FETCH_COLUMN, 0 ) );
     }
 
     /**
@@ -633,11 +676,11 @@ class PdoAdapter implements StreamingAdapterInterface {
             return false;
         }
 
-        $fetcher = static function () use ( $stmt ) : ?array {
+        $fetcher = function () use ( $stmt ) : ?array {
             $row = $stmt->fetch( PDO::FETCH_ASSOC );
 
             if ( false !== $row ) {
-                return $row;
+                return $this->read_row( $row );
             }
 
             // With a non-exception error mode, false is also how a failed read looks.

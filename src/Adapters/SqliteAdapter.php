@@ -14,6 +14,7 @@ use Exception;
 use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
+use Callismart\DBPrism\Utils\ParamType;
 use SQLite3Result;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 
@@ -85,12 +86,22 @@ class SqliteAdapter implements StreamingAdapterInterface {
             $encryption = ! empty( $this->config->encryption_key ) ? $this->config->encryption_key : '';
 
             $this->sqlite = new SQLite3( $filename, (int) $flags, $encryption );
+
+            // Failures throw instead of raising PHP warnings; every call below
+            // catches them and reports through get_last_error().
+            $this->sqlite->enableExceptions( true );
             $this->sqlite->busyTimeout( 5000 );
-            
-            $this->sqlite->exec( "PRAGMA temp_store   = MEMORY;" );
-            $this->sqlite->exec( "PRAGMA mmap_size    = 268435456;" );
-            $this->sqlite->exec( 'PRAGMA journal_mode=WAL;' );
-            $this->sqlite->exec( 'PRAGMA synchronous=NORMAL;' );
+
+            // Tuning only: a setting the database refuses (for example WAL on a
+            // read-only file) does not stop the connection.
+            foreach ( [ 'PRAGMA temp_store = MEMORY;', 'PRAGMA mmap_size = 268435456;', 'PRAGMA journal_mode = WAL;', 'PRAGMA synchronous = NORMAL;' ] as $pragma ) {
+                try {
+                    $this->sqlite->exec( $pragma );
+                } catch ( Exception $e ) {
+                    // Keep the engine default.
+                }
+            }
+
             return true;
         } catch ( Exception $e ) {
             $this->last_error = $e->getMessage();
@@ -105,7 +116,11 @@ class SqliteAdapter implements StreamingAdapterInterface {
      */
     public function close() : void {
         if ( $this->sqlite ) {
-            $this->sqlite->close();
+            try {
+                $this->sqlite->close();
+            } catch ( Exception $e ) {
+                $this->last_error = $e->getMessage();
+            }
         }
 
         $this->sqlite = null;
@@ -121,7 +136,7 @@ class SqliteAdapter implements StreamingAdapterInterface {
             // 'BEGIN IMMEDIATE' locks the database file 
             // against concurrent writers right now until busy timesout
             // period elapses.
-            $this->sqlite->exec( 'BEGIN IMMEDIATE TRANSACTION;' );
+            $this->transaction_command( 'BEGIN IMMEDIATE TRANSACTION;' );
         }
     }
 
@@ -131,7 +146,7 @@ class SqliteAdapter implements StreamingAdapterInterface {
      * @return void
      */
     public function commit() : void {
-        $this->sqlite->exec( 'COMMIT' );
+        $this->transaction_command( 'COMMIT' );
     }
 
     /**
@@ -140,7 +155,29 @@ class SqliteAdapter implements StreamingAdapterInterface {
      * @return void
      */
     public function rollback() : void {
-        $this->sqlite->exec( 'ROLLBACK' );
+        $this->transaction_command( 'ROLLBACK' );
+    }
+
+    /**
+     * Run a transaction control statement.
+     *
+     * A failure is recorded rather than thrown, so a failed ROLLBACK inside
+     * Database::transactional() cannot hide the exception that caused it.
+     *
+     * @param string $command BEGIN, COMMIT or ROLLBACK statement.
+     * @return void
+     */
+    protected function transaction_command( string $command ) : void {
+        if ( ! $this->sqlite ) {
+            $this->last_error = 'No active SQLite3 connection.';
+            return;
+        }
+
+        try {
+            $this->sqlite->exec( $command );
+        } catch ( Exception $e ) {
+            $this->last_error = $e->getMessage();
+        }
     }
 
     /**
@@ -153,6 +190,14 @@ class SqliteAdapter implements StreamingAdapterInterface {
      */
     protected function query( $query, array $params = [] ) : SQLite3Result|false {
         $this->last_error = null;
+
+        // A value that cannot be bound throws here, before anything is sent
+        // (the catch below records SQLite errors only).
+        $bindings = [];
+
+        foreach ( array_values( $params ) as $param ) {
+            $bindings[] = [ $this->get_bind_value( $param ), $this->get_bind_type( $param ) ];
+        }
 
         if ( ! $this->ensure_connection() ) {
             return false;
@@ -167,10 +212,8 @@ class SqliteAdapter implements StreamingAdapterInterface {
                 return false;
             }
 
-            if ( ! empty( $params ) ) {
-                foreach ( $params as $i => $value ) {
-                    $stmt->bindValue( $i + 1, $value, $this->get_type( $value ) );
-                }
+            foreach ( $bindings as $i => [ $value, $type ] ) {
+                $stmt->bindValue( $i + 1, $value, $type );
             }
 
             $result = $stmt->execute();
@@ -188,24 +231,44 @@ class SqliteAdapter implements StreamingAdapterInterface {
 
             return $result;
         } catch ( \Exception $e ) {
-            $this->last_error   = $e->getMessage();
+            // SQLite3 throws only \Exception here; its own message, without
+            // the "Unable to prepare/execute statement:" prefix.
+            $this->last_error   = $this->sqlite->lastErrorMsg();
             return false;
         }
     }
 
     /**
-     * Determine the correct SQLITE3 type constant for a PHP value.
+     * The SQLITE3_* type for a value.
      *
-     * @param mixed $value The value to check.
-     * @return int SQLITE3 constant (INTEGER, FLOAT, TEXT, NULL, or BLOB).
+     * @param mixed $value Value to bind.
+     * @return int
+     * @throws \InvalidArgumentException When the value cannot be bound.
      */
-    protected function get_type( $value ) : int {
-        if ( is_int( $value ) ) return SQLITE3_INTEGER;
-        if ( is_float( $value ) ) return SQLITE3_FLOAT;
-        if ( is_null( $value ) ) return SQLITE3_NULL;
-        if ( is_bool( $value ) ) return SQLITE3_INTEGER;
-        if ( is_resource( $value ) ) return SQLITE3_BLOB;
-        return SQLITE3_TEXT;
+    protected function get_bind_type( mixed $value ) : int {
+        return match ( ParamType::of( $value ) ) {
+            ParamType::NULL     => SQLITE3_NULL,
+            ParamType::BOOL,
+            ParamType::INT      => SQLITE3_INTEGER,
+            ParamType::FLOAT    => SQLITE3_FLOAT,
+            ParamType::STRING   => SQLITE3_TEXT,
+            ParamType::BINARY   => SQLITE3_BLOB,
+        };
+    }
+
+    /**
+     * The value to pass to bindValue().
+     *
+     * SQLite3 binds every type as it is, including a stream as a blob.
+     *
+     * @param mixed $value Value to bind.
+     * @return mixed
+     * @throws \InvalidArgumentException When the value cannot be bound.
+     */
+    protected function get_bind_value( mixed $value ) : mixed {
+        ParamType::of( $value );
+
+        return $value;
     }
 
     /**
@@ -477,7 +540,11 @@ class SqliteAdapter implements StreamingAdapterInterface {
         $sqlite = $this->sqlite;
 
         $fetcher = static function () use ( $result, $sqlite ) : ?array {
-            $row = $result->fetchArray( SQLITE3_ASSOC );
+            try {
+                $row = $result->fetchArray( SQLITE3_ASSOC );
+            } catch ( Exception $e ) {
+                throw new DBResultStreamException( 'Fetching a row failed: ' . $sqlite->lastErrorMsg(), $sqlite->lastErrorCode(), $e );
+            }
 
             if ( false !== $row ) {
                 return $row;

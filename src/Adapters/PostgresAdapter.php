@@ -155,7 +155,7 @@ class PostgresAdapter extends PdoAdapter {
                 }
             }
 
-            return $batch[ $index++ ];
+            return $this->read_row( $batch[ $index++ ] );
         };
 
         $closer = function () use ( $cursor, $own ) : void {
