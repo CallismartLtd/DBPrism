@@ -58,23 +58,26 @@ class CompoundQueryIntent implements QueryIntentInterface {
 
     /**
      * Construct a compound context wrapping two starting operations.
-     * 
+     *
+     * The compound query gets its own copy of the builder, so the primary
+     * query's builder keeps building the primary query alone.
+     *
      * @param QueryIntentInterface $primary  The initial root dataset expression.
      * @param QueryIntentInterface $next     The secondary query block to stack.
      * @param string               $operator The target relational operator (e.g., 'UNION').
-     * @param SQLBuilder           $builder  The parent state coordinator.
+     * @param SQLBuilder           $builder  The primary query's builder; copied, never changed.
      */
-    public function __construct( 
-        QueryIntentInterface $primary, 
-        QueryIntentInterface $next, 
-        string $operator, 
-        SQLBuilder $builder 
+    public function __construct(
+        QueryIntentInterface $primary,
+        QueryIntentInterface $next,
+        string $operator,
+        SQLBuilder $builder
     ) {
         $this->primary_intent = $primary;
-        $this->builder        = $builder;
+        $this->builder        = clone $builder;
         $this->unions[]       = new UnionPayload( $next, $operator );
-        
-        // Update the orchestrator's state target tracking pointer.
+
+        // Point the copied builder at this compound query.
         $this->builder->set_active_intent( $this );
         $this->builder->set_type( 'COMPOUND SELECT' );
     }
