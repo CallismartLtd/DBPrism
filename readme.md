@@ -40,26 +40,22 @@
 
 ## What is DBPrism?
 
-DBPrism is a framework-agnostic database abstraction layer that unifies database operations across **MySQL**, **MariaDB**, **PostgreSQL**, and **SQLite**.
+DBPrism lets one PHP codebase run on MySQL, MariaDB, PostgreSQL and SQLite. You describe a query, a table or a schema change, and DBPrism writes the SQL for the engine you are on.
 
-Like a prism refracting light into its component colors, DBPrism takes your query intents and refracts them into engine-specific SQL—transparently, elegantly, and efficiently.
+It is made of parts that work on their own. Use one, some or all of them:
 
-Every layer has one job:
+- **Query builder.** Turns what you describe into SQL and its bound values for a given engine. It never opens or touches a connection, so its output runs through DBPrism, plain PDO, or whatever client your application already uses.
+- **Database layer.** One API over the native drivers and PDO. It is optional, and it never asks to own your connection: an adapter can wrap the one your application already opened (see [Your Own Adapter](#your-own-adapter)).
+- **Schema inspection.** Reads tables, columns, indexes and constraints the same way on every engine.
+- **Migrations.** Ordered schema changes, recorded by each database, where every step is safe to run again. On SQLite, the changes its `ALTER TABLE` cannot make are done by rebuilding the table.
+
+Inspection and migrations run on the database layer; the query builder needs nothing else.
+
+Inside, each layer has one job:
 
 - An **intent** records what you want (a SELECT, a new table, a column change).
-- A **renderer** translates the intent into the SQL of one engine.
-- An **adapter** executes that SQL on one connection.
-
-### Core Features
-
-- **🔄 Unified Adapters** — One API over MySQL/MariaDB, PostgreSQL, and SQLite, through their native drivers or PDO
-- **🎯 Intent-Based Query Building** — Declarative query construction with automatic SQL rendering
-- **🔍 Schema Inspection** — Schema introspection across all engines
-- **🚀 Safe Migrations** — Ordered, recorded migrations whose every step is safe to run again
-- **⚡ Multi-Engine Rendering** — One query intent → Multiple engine-specific SQL outputs
-- **💪 Type Normalization** — Consistent column types across databases
-- **🌊 Streaming** — Read large result sets row by row, without loading them into memory
-- **🧩 Framework-Agnostic** — Works standalone or integrated with any framework
+- A **renderer** writes that intent in the SQL of one engine.
+- An **adapter** runs the SQL on one connection.
 
 ---
 
@@ -77,7 +73,7 @@ composer require callismart/dbprism
 | Engine | Native adapter | PDO adapter |
 |---|---|---|
 | MySQL / MariaDB | `mysqli` | `pdo_mysql` |
-| PostgreSQL | — | `pdo_pgsql` |
+| PostgreSQL | None | `pdo_pgsql` |
 | SQLite | `sqlite3` | `pdo_sqlite` |
 
 ---
@@ -257,6 +253,20 @@ $db->set_adapter( new MysqliAdapter( $config ) );
 | `execute( $sql, $bindings )` | The number of rows affected |
 | `exec( $sql )` | `true` on success; for statements without values, such as schema changes |
 
+The SQL is ordinary SQL, so the database layer is not required. With a connection you already have:
+
+```php
+$intent = ( new SQLBuilder( 'pgsql' ) )
+    ->select( 'id', 'email' )
+    ->from( 'users' )
+    ->where( 'status', '=', 'active' );
+
+$stmt = $pdo->prepare( $intent->build() );
+$stmt->execute( $intent->get_bindings() );
+```
+
+Run that way, the values are bound by your client, not by the rules below.
+
 #### Bound Values
 
 A value's PHP type decides how it is sent; its contents are never inspected, so `'123'` stays a string.
@@ -361,7 +371,7 @@ The search helpers escape `%` and `_` in the term, so they always match literall
 ->where_like( 'email', '%@example.com' )
 ```
 
-Each has `or_` and `not_` forms (`or_where_contains()`, `where_not_starts_with()`, …).
+Each has `or_` and `not_` forms (`or_where_contains()`, `where_not_starts_with()` and so on).
 
 #### Subqueries
 
@@ -584,7 +594,7 @@ $intent = $builder->delete( 'sessions' )
 
 ### CREATE TABLE
 
-Create tables using the `CreateTableIntent` class with fluent `Column` and `Constraint` builders.
+`create_table()` returns a `CreateTableIntent`, built from `Column` and `Constraint` objects.
 
 #### Basic CREATE TABLE
 
@@ -829,7 +839,7 @@ $db->exec( $sql );
 
 ## Schema Inspection
 
-Inspect database schema using the `Inspector` class.
+The `Inspector` reads the schema of the database it is given.
 
 ```php
 use Callismart\DBPrism\Inspection\Inspector;
@@ -845,7 +855,7 @@ $tables = $inspector->get_all_tables();
 
 // Check if table exists
 if ( $inspector->table_exists( 'users' ) ) {
-    echo "Table exists!";
+    // ...
 }
 
 // Get table metadata
@@ -951,11 +961,7 @@ $info = $inspector->get_database_info();
 
 ## Migrations
 
-A migration is a named, one-time change to a database, written as intent, applied in a fixed order, and remembered by the database it was applied to.
-
-- **Named:** a migration's name is its fully qualified class name.
-- **Fixed order:** migrations run in the order your application lists them.
-- **Remembered:** each database records the migrations applied to it, in a ledger table.
+A migration is a one-time change to a database. It is a class, and its fully qualified class name is its name. Migrations run in the order your application lists them, and each database records the ones applied to it in a ledger table, so none runs twice.
 
 ### Writing a Migration
 
@@ -1068,7 +1074,7 @@ $this->constraint( 'licenses' )->add_foreign_key(
 
 ### No Data Is Lost
 
-A change never loses data on its way through. When a stored value cannot be carried into a changed column unchanged — a string too long for the new length, text in a numeric column, a number out of range, `NULL` in a `NOT NULL` column — the change is refused and the table is left as it was. MySQL runs the change in strict mode for this, whatever the session's own `sql_mode`.
+A change never loses data on its way through. When a stored value cannot be carried into a changed column unchanged, the change is refused and the table is left as it was. That covers a string too long for the new length, text in a numeric column, a number out of range, and `NULL` in a `NOT NULL` column. MySQL runs the change in strict mode for this, whatever the session's own `sql_mode`.
 
 To lose data on purpose, change the data first (for example, shorten the strings with an UPDATE), then the column. The one conversion that is not refused is rounding to a declared scale, such as `DECIMAL(10,4)` to `DECIMAL(10,2)`.
 
@@ -1158,7 +1164,7 @@ The stream closes when it is read to the end, when `close()` is called, or when 
 
 ## Transactions
 
-Execute multiple queries atomically with automatic rollback on failure.
+`transactional()` runs a callback inside a transaction. It commits when the callback returns, and rolls back and rethrows when it throws.
 
 ```php
 try {
@@ -1180,10 +1186,10 @@ try {
 
 1. **Always Use Parameterized Queries**
    ```php
-   // ✓ Good
+   // Good
    $user = $db->get_row( 'SELECT * FROM users WHERE id = ?', [ $id ] );
 
-   // ✗ Bad - SQL injection vulnerability
+   // Bad: open to SQL injection
    $user = $db->get_row( "SELECT * FROM users WHERE id = {$id}" );
    ```
 
@@ -1201,7 +1207,7 @@ try {
 
    Migrations record what each database has applied and make every step safe to repeat. A schema change made by hand is invisible to them.
 
-4. **Leverage the Inspector for Schema-Aware Logic**
+4. **Check the Schema with the Inspector**
    ```php
    $inspector = new Inspector( $db );
    if ( $inspector->table_exists( 'users' ) &&
@@ -1242,19 +1248,13 @@ composer test:dbconn:pdo-sqlite
 
 ## Contributing
 
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions are welcome. Fork the repository, make your change on a branch, run `composer test`, and open a pull request.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).
 
 ---
 
@@ -1268,11 +1268,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Support
 
-For issues, questions, or feature requests:
-- 🐛 [Report a bug](https://github.com/CallismartLtd/dbprism/issues)
-- 💡 [Request a feature](https://github.com/CallismartLtd/dbprism/issues)
-- 📖 [Read the documentation](https://github.com/CallismartLtd/dbprism/wiki)
-
----
-
-**Made with ❤️ by Callismart**
+Report bugs and request features on the [issue tracker](https://github.com/CallismartLtd/dbprism/issues).
