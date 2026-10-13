@@ -221,13 +221,9 @@ $adapter = new PdoAdapter( $config );
 $db      = new Database( $adapter );
 ```
 
-### WordPress
-```php
-use Callismart\DBPrism\Adapters\WPDBAdapter;
+### Your Own Adapter
 
-$adapter = new WPDBAdapter();
-$db = new Database($adapter);
-```
+Any connection can be used by implementing `DatabaseAdapterInterface` (and `StreamingAdapterInterface` for `stream()`). Map bound values with `ParamType::of()`, as the built-in adapters do, so they are sent the same way on every connection (see [Bound Values](#bound-values)).
 
 ### Before a Database Is Configured
 
@@ -260,6 +256,33 @@ $db->set_adapter( new MysqliAdapter( $config ) );
 | `get_var( $sql, $bindings )` | The first column of the first row, or `null` |
 | `execute( $sql, $bindings )` | The number of rows affected |
 | `exec( $sql )` | `true` on success; for statements without values, such as schema changes |
+
+#### Bound Values
+
+A value's PHP type decides how it is sent; its contents are never inspected, so `'123'` stays a string.
+
+| PHP value | Sent as |
+|---|---|
+| `null` | NULL |
+| `bool` | Boolean (`1` / `0` on MySQL and SQLite) |
+| `int` | Integer |
+| `float` | Number, exactly: `0.1 + 0.2` arrives as `0.30000000000000004` |
+| `string` | Text |
+| Open stream resource | Binary data (`BLOB`, `BYTEA`) |
+
+Anything else (an array, an object, `INF` or `NAN`) throws `InvalidArgumentException` before the query is sent.
+
+Binary data is marked by passing it as a stream, which is read from its current position to the end:
+
+```php
+$stream = fopen( 'php://memory', 'r+' );
+fwrite( $stream, $bytes );
+rewind( $stream );
+
+$db->insert( 'files', [ 'name' => 'logo.png', 'content' => $stream ] );
+```
+
+Binary columns are read back as strings on every engine.
 
 ### SELECT Queries
 
@@ -1189,7 +1212,7 @@ try {
 
 5. **Check Every Result**
 
-   Query methods return `false`, `null` or an empty result on failure rather than throwing. Check the result, and read `$db->get_last_error()` for the reason.
+   Query methods return `false`, `null` or an empty result on failure rather than throwing. Check the result, and read `$db->get_last_error()` for the reason. The exception is a value that cannot be bound (see [Bound Values](#bound-values)), which throws: it is a mistake in the code, not a database failure.
 
 ---
 

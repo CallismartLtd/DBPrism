@@ -1,6 +1,6 @@
 {
     "name": "callismart/dbprism",
-    "description": "DBPrism: Intent-based database abstraction layer with unified adapters, schema inspection, and migrations. Supports MySQL, PostgreSQL, SQLite, PDO, and WordPress.",
+    "description": "DBPrism: Intent-based database abstraction layer with unified adapters, schema inspection, and migrations. Supports MySQL, MariaDB, PostgreSQL, and SQLite, through native drivers or PDO.",
     "type": "library",
     "keywords": [
         "database",
@@ -10,12 +10,12 @@
         "migrations",
         "schema",
         "mysql",
+        "mariadb",
         "postgresql",
         "sqlite",
-        "pdo",
-        "wordpress"
+        "pdo"
     ],
-    "homepage": "https://github.com/callismart/dbprism",
+    "homepage": "https://github.com/CallismartLtd/dbprism",
     "license": "MIT",
     "require": {
         "php": "^8.1",
