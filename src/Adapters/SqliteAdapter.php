@@ -53,7 +53,7 @@ class SqliteAdapter implements StreamingAdapterInterface {
     /**
      * Constructor.
      *
-     * @param DBConfigDTO $config Database configuration including 'database' path and optional 'flags'.
+     * @param DBConfigDTO $config Database configuration: 'dbname' (and optional 'path') locate the file.
      */
     public function __construct( DBConfigDTO $config ) {
         $this->config = $config;
@@ -80,12 +80,11 @@ class SqliteAdapter implements StreamingAdapterInterface {
             $this->last_error = null;
 
             $filename   = $this->build_sqlite_path();
-
-
-            $flags      = ! empty( $this->config->flags ) ? $this->config->flags : ( SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE );
             $encryption = ! empty( $this->config->encryption_key ) ? $this->config->encryption_key : '';
 
-            $this->sqlite = new SQLite3( $filename, (int) $flags, $encryption );
+            // Always read-write, creating the file when it does not exist. The
+            // configuration's "flags" are connection options for PDO, not SQLite's open mode.
+            $this->sqlite = new SQLite3( $filename, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $encryption );
 
             // Failures throw instead of raising PHP warnings; every call below
             // catches them and reports through get_last_error().
@@ -247,12 +246,12 @@ class SqliteAdapter implements StreamingAdapterInterface {
      */
     protected function get_bind_type( mixed $value ) : int {
         return match ( ParamType::of( $value ) ) {
-            ParamType::NULL     => SQLITE3_NULL,
+            ParamType::NULL   => SQLITE3_NULL,
             ParamType::BOOL,
-            ParamType::INT      => SQLITE3_INTEGER,
-            ParamType::FLOAT    => SQLITE3_FLOAT,
-            ParamType::STRING   => SQLITE3_TEXT,
-            ParamType::BINARY   => SQLITE3_BLOB,
+            ParamType::INT    => SQLITE3_INTEGER,
+            ParamType::FLOAT  => SQLITE3_FLOAT,
+            ParamType::STRING => SQLITE3_TEXT,
+            ParamType::BINARY => SQLITE3_BLOB,
         };
     }
 
@@ -591,7 +590,10 @@ class SqliteAdapter implements StreamingAdapterInterface {
         $this->connect();
 
         if ( ! $this->is_connected() ) {
-            $this->last_error = 'No active SQLite3 connection.';
+            // Keep the reason connect() recorded.
+            if ( empty( $this->last_error ) ) {
+                $this->last_error = 'No active SQLite3 connection.';
+            }
             return false;
         }
 
