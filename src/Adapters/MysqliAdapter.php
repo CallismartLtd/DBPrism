@@ -615,6 +615,13 @@ class MysqliAdapter implements StreamingAdapterInterface {
                 }
             } while ( $this->mysqli->more_results() && $this->mysqli->next_result() );
 
+            // With error reporting off, a later statement
+            // that fails ends the loop instead of throwing.
+            if ( 0 !== $this->mysqli->errno ) {
+                $this->last_error = $this->mysqli->error;
+                return false;
+            }
+
             return true;
         } catch ( mysqli_sql_exception $e ) {
             $this->last_error = $e->getMessage();
