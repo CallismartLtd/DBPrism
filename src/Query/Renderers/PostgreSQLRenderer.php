@@ -11,8 +11,6 @@ namespace Callismart\DBPrism\Query\Renderers;
 
 use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
-use Callismart\DBPrism\Query\QueryIntents\CreateIndexIntent;
-use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
 use Callismart\DBPrism\Utils\Constraint;
 use Callismart\DBPrism\Utils\Column;
@@ -104,22 +102,6 @@ class PostgreSQLRenderer extends AbstractQueryRenderer {
         }
 
         return $table_sql;
-    }
-
-    /**
-     * Render a standalone CREATE INDEX.
-     * 
-     * @param CreateIndexIntent $intent
-     * @return string
-     */
-    public function render_create_index( CreateIndexIntent $intent ) : string {
-        $table = $this->quote_identifier( $intent->get_table_name() );
-        $index = $intent->get_index();
-        $type  = ( strtolower( $index->type ) === 'unique' ) ? 'UNIQUE INDEX' : 'INDEX';
-        $name  = $index->name ? $this->quote_identifier( $index->name ) : '';
-        $cols  = implode( ', ', $this->quote_identifiers( $index->columns ) );
-
-        return trim( "CREATE {$type} {$name} ON {$table} ({$cols});" );
     }
 
     protected function render_inline_index_as_create_index( string $table, Constraint $constraint ) : string {

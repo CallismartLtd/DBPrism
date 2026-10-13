@@ -11,7 +11,6 @@ namespace Callismart\DBPrism\Query\Renderers;
 
 use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\CompoundQueryIntent;
-use Callismart\DBPrism\Query\QueryIntents\CreateIndexIntent;
 use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
 use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
@@ -90,14 +89,6 @@ abstract class AbstractQueryRenderer {
      * @return string
      */
     abstract public function render_truncate_table( TruncateTableIntent $intent ) : string;
-
-    /**
-     * Render a standalone CREATE INDEX SQL statement.
-     * 
-     * @param CreateIndexIntent $intent
-     * @return string
-     */
-    abstract public function render_create_index( CreateIndexIntent $intent ) : string;
 
     /**
      * Render a table constraint or index definition for CREATE/ALTER context.
