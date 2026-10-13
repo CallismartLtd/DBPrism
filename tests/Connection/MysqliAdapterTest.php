@@ -1,6 +1,6 @@
 <?php
 
-namespace Callismart\DBPrism\Tests\Adapters;
+namespace Callismart\DBPrism\Tests\Connection;
 
 use PHPUnit\Framework\TestCase;
 use Callismart\DBPrism\Adapters\MysqliAdapter;

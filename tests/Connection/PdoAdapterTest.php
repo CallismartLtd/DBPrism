@@ -1,11 +1,10 @@
 <?php
 
-namespace Callismart\DBPrism\Tests\Adapters;
+namespace Callismart\DBPrism\Tests\Connection;
 
 use PHPUnit\Framework\TestCase;
 use Callismart\DBPrism\Adapters\PdoAdapter;
 use Callismart\DBPrism\DBConfigDTO;
-use PDO;
 
 class PdoAdapterTest extends TestCase {
 

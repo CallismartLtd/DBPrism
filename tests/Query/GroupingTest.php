@@ -5,6 +5,8 @@
 
 declare( strict_types=1 );
 
+namespace Callismart\DBPrism\Tests\Query;
+
 use PHPUnit\Framework\TestCase;
 
 use function Callismart\DBPrism\tests\{

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace CallismartDBPrism\Tests\Query\Intent;
+namespace Callismart\DBPrism\Tests\Query\Intent;
 
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\SQLBuilder;
