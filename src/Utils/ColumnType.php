@@ -97,7 +97,7 @@ final class ColumnType {
 				self::TEXT			=> 'TEXT',
 				self::LONG_TEXT		=> 'LONGTEXT',
 
-				self::BINARY		=> 'VARBINARY',
+				self::BINARY		=> 'BINARY',
 				self::BLOB			=> 'BLOB',
 
 				self::DATE			=> 'DATE',
@@ -196,6 +196,11 @@ final class ColumnType {
 				(int) ( $args['precision'] ?? 10 ),
 				(int) ( $args['scale'] ?? 2 )
 			),
+
+			// Only MySQL's BINARY takes a length; BYTEA and BLOB do not.
+			self::BINARY => 'BINARY' === $native
+				? sprintf( '%s(%d)', $native, (int) ( $args['length'] ?? 1 ) )
+				: $native,
 
 			self::UUID => 'CHAR' === $native
 				? 'CHAR(36)'
