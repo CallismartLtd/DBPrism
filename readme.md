@@ -1,8 +1,6 @@
 # DBPrism
 
-> **Refract your queries across any database.**
->
-> Intent-based database abstraction layer with unified adapters, schema inspection, and migrations. Write once. Query everywhere.
+Write a query once and run it on MySQL, MariaDB, PostgreSQL or SQLite. A small PHP library with no framework attached.
 
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-blue.svg)](https://www.php.net)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -1114,6 +1112,16 @@ $migrator->pending();   // registered migrations not applied yet
 $migrator->status();    // [ class => [ 'registered', 'applied', 'run', 'applied_at' ] ]
 $migrator->revert();    // undo the most recent run; returns the class names reverted
 ```
+
+#### Fresh Installations
+
+An application that creates its current schema directly on installation calls `baseline()` once, instead of `migrate()`:
+
+```php
+$migrator->baseline();  // records every registered migration as applied, without running it
+```
+
+The new schema already contains every registered migration's change, so none of them may run on it later; after the baseline, `migrate()` runs only migrations added by later releases. `baseline()` works only on a database the `Migrator` has never touched (one without a ledger table), and throws otherwise, so it cannot mark a migration an existing installation still needs as applied. It creates the ledger even when no migration is registered yet. The baseline is recorded as run 0, which `revert()` never undoes.
 
 | Rule | Meaning |
 |---|---|
