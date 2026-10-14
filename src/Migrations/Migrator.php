@@ -33,6 +33,7 @@ use Throwable;
  *   $migrator->migrate();   // applies what is not yet applied, in list order
  *   $migrator->revert();    // undoes the most recent run
  *   $migrator->status();    // what is applied and what is pending
+ *   $migrator->baseline();  // on a fresh installation: records all as applied
  *
  * Rules:
  *
@@ -52,10 +53,18 @@ use Throwable;
  *    when every migration in it is reversible.
  *  - One run at a time: a run holds a lock, and a second one started
  *    meanwhile throws MigrationLockedException without changing anything.
+ *  - A fresh installation that creates the current schema directly calls
+ *    baseline() instead of migrate(): every registered migration is recorded
+ *    as applied (run 0, never reverted) without running.
  *
  * @since 0.2.0
  */
 class Migrator {
+
+	/**
+	 * Run number of the migrations a baseline records.
+	 */
+	public const BASELINE_RUN = 0;
 
 	/**
 	 * The registered migration class names, in order.
@@ -145,6 +154,49 @@ class Migrator {
 	}
 
 	/**
+	 * Record every registered migration as applied, without running it.
+	 *
+	 * For a fresh installation whose schema was created at the current
+	 * release: that schema already contains every registered migration's
+	 * change, so none of them may run on it later. After the baseline,
+	 * migrate() runs only migrations registered by later releases.
+	 *
+	 * Only a database the Migrator has never touched can be baselined: one
+	 * without a ledger table. The baseline creates the table even when no
+	 * migration is registered, and migrate() creates it on every call, so
+	 * once either has run, baseline() refuses. That keeps it from marking a
+	 * migration an installation still needs as applied.
+	 *
+	 * The baseline is recorded as run 0, which revert() does not undo: its
+	 * changes were made by the installation, not by the migrations' up().
+	 *
+	 * @return string[] The migrations recorded, in list order.
+	 * @throws MigrationLockedException When another run is in progress; nothing was changed.
+	 * @throws MigrationException       When the database has a ledger already (nothing was
+	 *                                  changed), or a migration cannot be recorded.
+	 */
+	public function baseline() : array {
+		if ( $this->ledger->exists() ) {
+			throw new MigrationException(
+				sprintf( 'Cannot baseline: the migration ledger %s already exists, so migrations have been managed on this database before.', $this->ledger->get_table() )
+			);
+		}
+
+		return $this->locked( function () {
+			// Another baseline may have recorded between the check and the lock.
+			if ( ! empty( $this->ledger->applied() ) ) {
+				throw new MigrationException( 'Cannot baseline: migrations were recorded on this database meanwhile.' );
+			}
+
+			foreach ( $this->migrations as $class ) {
+				$this->ledger->record( $class, self::BASELINE_RUN );
+			}
+
+			return $this->migrations;
+		} );
+	}
+
+	/**
 	 * Undo the most recent run, newest migration first.
 	 *
 	 * Every migration in the run must be registered and reversible, or
@@ -162,7 +214,8 @@ class Migrator {
 			$applied = $this->ledger->applied();
 			$run     = $this->ledger->last_run();
 
-			if ( 0 === $run ) {
+			// Nothing applied, or only the baseline, which is never reverted.
+			if ( self::BASELINE_RUN === $run ) {
 				return [];
 			}
 
