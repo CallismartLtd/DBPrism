@@ -18,6 +18,7 @@ use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use Callismart\DBPrism\Utils\DsnBuilder;
+use Callismart\DBPrism\Utils\Identifier;
 use Callismart\DBPrism\Utils\ParamType;
 use Callismart\DBPrism\Utils\SQLStatementSplitter;
 
@@ -430,12 +431,26 @@ class PdoAdapter implements StreamingAdapterInterface {
     }
 
     /**
+     * The identifier quote character insert(), update() and delete() quote
+     * table and column names with.
+     *
+     * Backtick for MySQL and MariaDB, the SQL standard double quote for the
+     * other drivers.
+     *
+     * @return string
+     */
+    protected function identifier_quote() : string {
+        return 'mysql' === ( $this->config->driver ?? null ) ? '`' : '"';
+    }
+
+    /**
      * Insert a record into the database.
      *
      * @param string $table Table name.
      * @param array  $data  Associative array of column => value.
      *
      * @return int|false The inserted record ID on success, false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function insert( $table, array $data ) : int|false {
         if ( empty( $data ) ) {
@@ -443,12 +458,13 @@ class PdoAdapter implements StreamingAdapterInterface {
             return false;
         }
 
-        $columns = array_keys( $data );
+        $quote        = $this->identifier_quote();
+        $columns      = Identifier::columns( $data, $quote );
         $placeholders = array_fill( 0, count( $data ), '?' );
 
         $query = sprintf(
             'INSERT INTO %s (%s) VALUES (%s)',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $columns ),
             implode( ', ', $placeholders )
         ) . $this->insert_returning( $table );
@@ -475,6 +491,7 @@ class PdoAdapter implements StreamingAdapterInterface {
      * @param array  $where Associative array for WHERE conditions.
      *
      * @return int|false Number of affected rows, or false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function update( $table, array $data, array $where ) : int|false {
         if ( empty( $data ) || empty( $where ) ) {
@@ -482,19 +499,21 @@ class PdoAdapter implements StreamingAdapterInterface {
             return false;
         }
 
+        $quote = $this->identifier_quote();
+
         // Build SET clause with ? placeholders
         $set_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $data ) );
+        }, Identifier::columns( $data, $quote ) );
 
         // Build WHERE clause with ? placeholders
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $where ) );
+        }, Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'UPDATE %s SET %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $set_clauses ),
             implode( ' AND ', $where_clauses )
         );
@@ -518,6 +537,7 @@ class PdoAdapter implements StreamingAdapterInterface {
      * @param array  $where Associative array for WHERE conditions.
      *
      * @return int|false Number of affected rows, or false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function delete( $table, array $where ) : int|false {
         if ( empty( $where ) ) {
@@ -525,14 +545,16 @@ class PdoAdapter implements StreamingAdapterInterface {
             return false;
         }
  
+        $quote = $this->identifier_quote();
+
         // Build WHERE clause with ? placeholders
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $where ) );
+        }, Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'DELETE FROM %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ' AND ', $where_clauses )
         );
 

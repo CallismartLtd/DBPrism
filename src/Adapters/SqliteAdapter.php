@@ -15,6 +15,7 @@ use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
 use Callismart\DBPrism\Utils\ParamType;
+use Callismart\DBPrism\Utils\Identifier;
 use SQLite3Result;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 
@@ -358,21 +359,35 @@ class SqliteAdapter implements StreamingAdapterInterface {
     }
 
     /**
+     * The identifier quote character insert(), update() and delete() quote
+     * table and column names with.
+     *
+     * Double quote, the SQL standard.
+     *
+     * @return string
+     */
+    protected function identifier_quote() : string {
+        return '"';
+    }
+
+    /**
      * Insert a record into the database.
      *
      * @param string $table Table name.
      * @param array  $data  Associative array of column => value.
      * @return int|false The inserted record ID on success, false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function insert( $table, array $data ) : int|false {
         $this->last_error = null;
 
-        $columns = array_keys( $data );
+        $quote        = $this->identifier_quote();
+        $columns      = Identifier::columns( $data, $quote );
         $placeholders = array_fill( 0, count( $data ), '?' );
 
         $query = sprintf(
             'INSERT INTO %s (%s) VALUES (%s)',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $columns ),
             implode( ', ', $placeholders )
         );
@@ -388,17 +403,20 @@ class SqliteAdapter implements StreamingAdapterInterface {
      * @param array  $data  Associative array of column => value.
      * @param array  $where Associative array for WHERE conditions.
      * @return int|false Number of affected rows, or false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function update( $table, array $data, array $where ) : int|false {
 
         $this->last_error = null;
 
-        $set_clauses    = array_map( fn($col) => "$col = ?", array_keys( $data ) );
-        $where_clauses  = array_map( fn($col) => "$col = ?", array_keys( $where ) );
+        $quote = $this->identifier_quote();
+
+        $set_clauses    = array_map( fn( $col ) => "$col = ?", Identifier::columns( $data, $quote ) );
+        $where_clauses  = array_map( fn( $col ) => "$col = ?", Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'UPDATE %s SET %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $set_clauses ),
             implode( ' AND ', $where_clauses )
         );
@@ -415,16 +433,19 @@ class SqliteAdapter implements StreamingAdapterInterface {
      * @param string $table Table name.
      * @param array  $where Associative array for WHERE conditions.
      * @return int|false Number of affected rows, or false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function delete( $table, array $where ) : int|false {
 
         $this->last_error = null;
 
-        $where_clauses = array_map( fn($col) => "$col = ?", array_keys( $where ) );
+        $quote = $this->identifier_quote();
+
+        $where_clauses = array_map( fn( $col ) => "$col = ?", Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'DELETE FROM %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ' AND ', $where_clauses )
         );
 

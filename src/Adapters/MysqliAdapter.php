@@ -15,6 +15,7 @@ use Callismart\DBPrism\DBConfigDTO;
 use Callismart\DBPrism\DBResultStream;
 use Callismart\DBPrism\DBResultStreamException;
 use Callismart\DBPrism\Utils\ParamType;
+use Callismart\DBPrism\Utils\Identifier;
 use Callismart\DBPrism\Adapters\Contracts\StreamingAdapterInterface;
 use mysqli_sql_exception;
 use Throwable;
@@ -434,11 +435,24 @@ class MysqliAdapter implements StreamingAdapterInterface {
     }
 
     /**
+     * The identifier quote character insert(), update() and delete() quote
+     * table and column names with.
+     *
+     * Backtick for MySQL and MariaDB.
+     *
+     * @return string
+     */
+    protected function identifier_quote() : string {
+        return '`';
+    }
+
+    /**
      * Insert a record into the database.
      * 
      * @param string $table The table name.
      * @param array  $data  An associative array of column_name => value.
      * @return int|false The inserted record ID on success, false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function insert( $table, $data ) : int|false {
         if ( ! $this->ensure_connection() ) {
@@ -450,12 +464,13 @@ class MysqliAdapter implements StreamingAdapterInterface {
             return false;
         }
 
-        $columns      = array_keys( $data );
+        $quote        = $this->identifier_quote();
+        $columns      = Identifier::columns( $data, $quote );
         $placeholders = array_fill( 0, count( $data ), '?' );
 
         $query = sprintf(
             'INSERT INTO %s (%s) VALUES (%s)',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $columns ),
             implode( ', ', $placeholders )
         );
@@ -480,6 +495,7 @@ class MysqliAdapter implements StreamingAdapterInterface {
      * @param array  $data  An associative array of column_name => value.
      * @param array  $where An associative array of column_name => value for WHERE clause.
      * @return int|false Number of affected rows on success, false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function update( $table, $data, $where ) : int|false {
         if ( ! $this->ensure_connection() ) {
@@ -491,17 +507,19 @@ class MysqliAdapter implements StreamingAdapterInterface {
             return false;
         }
 
+        $quote = $this->identifier_quote();
+
         $set_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $data ) );
+        }, Identifier::columns( $data, $quote ) );
 
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $where ) );
+        }, Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'UPDATE %s SET %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ', ', $set_clauses ),
             implode( ' AND ', $where_clauses )
         );
@@ -525,6 +543,7 @@ class MysqliAdapter implements StreamingAdapterInterface {
      * @param string $table The table name.
      * @param array  $where An associative array of column_name => value for WHERE clause.
      * @return int|false Number of affected rows on success, false on failure.
+     * @throws \InvalidArgumentException When a table or column name is not a plain name.
      */
     public function delete( $table, $where ) : int|false {
         if ( ! $this->ensure_connection() ) {
@@ -536,13 +555,15 @@ class MysqliAdapter implements StreamingAdapterInterface {
             return false;
         }
 
+        $quote = $this->identifier_quote();
+
         $where_clauses = array_map( function( $column ) {
             return "$column = ?";
-        }, array_keys( $where ) );
+        }, Identifier::columns( $where, $quote ) );
 
         $query = sprintf(
             'DELETE FROM %s WHERE %s',
-            $table,
+            Identifier::table( $table, $quote ),
             implode( ' AND ', $where_clauses )
         );
 
@@ -615,7 +636,7 @@ class MysqliAdapter implements StreamingAdapterInterface {
                 }
             } while ( $this->mysqli->more_results() && $this->mysqli->next_result() );
 
-            // With error reporting off, a later statement
+            // With error reporting off (as WordPress sets it), a later statement
             // that fails ends the loop instead of throwing.
             if ( 0 !== $this->mysqli->errno ) {
                 $this->last_error = $this->mysqli->error;
