@@ -16,6 +16,9 @@
         <testsuite name="DBPrism Connection Tests">
             <directory>tests/Connection</directory>
         </testsuite>
+        <testsuite name="DBPrism Security Tests">
+            <directory>tests/Security</directory>
+        </testsuite>
     </testsuites>
 
     <php>
