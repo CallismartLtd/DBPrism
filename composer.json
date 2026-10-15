@@ -69,6 +69,7 @@
         "test:dbconn:pdo-sqlite": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=PdoSqliteTest",
         "test:dbconn:all": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Connection Tests\"",
 
-        "test:all": "phpunit --colors=always --testdox --display-warnings --display-deprecations"
+        "test:all": "phpunit --colors=always --testdox --display-warnings --display-deprecations",
+        "test:security": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Security Tests\""
     }
 }
