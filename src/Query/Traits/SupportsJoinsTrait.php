@@ -93,7 +93,7 @@ trait SupportsJoinsTrait {
             return $this->add_advanced_join_entry( $table, $first, 'RIGHT' );
         }
 
-        return $this->add_join_entry( $table, $first, $operator, $second, 'RIGHT' );
+        return $this->add_join_entry( $table, $first, $operator ?? '', $second ?? '', 'RIGHT' );
     }
 
     /**
