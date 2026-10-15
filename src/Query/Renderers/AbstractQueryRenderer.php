@@ -32,6 +32,27 @@ abstract class AbstractQueryRenderer {
     use ColumnNormalizerTrait;
 
     /**
+     * Comparison operators that may be written into SQL: those every engine
+     * accepts between a column and a bound value or another column.
+     *
+     * Operators, sort directions and connectors are the only parts of a
+     * condition written into the SQL as given: values are bound and
+     * identifiers are quoted. Each comes from a closed list, so a value
+     * outside it never reaches the SQL.
+     */
+    public const COMPARISON_OPERATORS = [ '=', '!=', '<>', '<', '<=', '>', '>=', 'LIKE', 'NOT LIKE' ];
+
+    /**
+     * Sort directions that may be written into SQL.
+     */
+    public const SORT_DIRECTIONS = [ 'ASC', 'DESC' ];
+
+    /**
+     * Logical connectors that may be written into SQL.
+     */
+    public const CONNECTORS = [ 'AND', 'OR' ];
+
+    /**
      * The database engine identifier (e.g., 'mysql', 'sqlite').
      * 
      * @var string
@@ -475,10 +496,10 @@ abstract class AbstractQueryRenderer {
     protected function render_where_clauses( array $conditions ) : string {
         $parts = [];
         foreach ( $conditions as $index => $condition ) {
-            $connector = ( $index === 0 ) ? '' : " {$condition['boolean']} ";
+            $connector = ( $index === 0 ) ? '' : ' ' . $this->connector( $condition['boolean'] ) . ' ';
 
             $clause = match ( $condition['type'] ) {
-                'Basic'     => sprintf( "%s %s ?", $this->quote_identifier( $condition['column'] ), $condition['operator'] ),
+                'Basic'     => sprintf( "%s %s ?", $this->quote_identifier( $condition['column'] ), $this->comparison_operator( $condition['operator'] ) ),
                 
                 'Null'      => sprintf( "%s IS %sNULL", $this->quote_identifier( $condition['column'] ), $condition['not'] ? 'NOT ' : '' ),
                                 
@@ -509,7 +530,7 @@ abstract class AbstractQueryRenderer {
                 'Column' => sprintf(
                     "%s %s %s",
                     $this->quote_identifier( $condition['first_column'] ),
-                    $condition['operator'],
+                    $this->comparison_operator( $condition['operator'] ),
                     $this->quote_identifier( $condition['second_column'] )
                 ),
 
@@ -628,13 +649,13 @@ abstract class AbstractQueryRenderer {
         
         foreach ( $havings as $index => $having ) {
             // Determine leading logical connector spacing states.
-            $lead_boolean = ( $index === 0 ) ? '' : ' ' . $having['boolean'] . ' ';
+            $lead_boolean = ( $index === 0 ) ? '' : ' ' . $this->connector( $having['boolean'] ) . ' ';
 
             if ( $having['type'] === 'case_expression' ) {
                 // Compile the case block safely: CASE WHEN ... END.
                 $case_str = $this->render_case_expression( $having['case_expression'] );
                 
-                $sql .= sprintf( "%s%s %s ?", $lead_boolean, $case_str, $having['operator'] );
+                $sql .= sprintf( "%s%s %s ?", $lead_boolean, $case_str, $this->comparison_operator( $having['operator'] ) );
             } else {
                 // If it is a basic aggregate condition, pass it straight to your 
                 // native renderer pipeline as an array of 1 element!
@@ -688,7 +709,7 @@ abstract class AbstractQueryRenderer {
                 $join['type'], 
                 $table_quoted, 
                 $this->quote_identifier( $join['first'] ), 
-                $join['operator'], 
+                $this->comparison_operator( $join['operator'] ), 
                 $this->quote_identifier( $join['second'] ) 
             );
         }
@@ -698,14 +719,14 @@ abstract class AbstractQueryRenderer {
     protected function render_join_conditions( array $conditions ) : string {
     $parts = [];
         foreach ( $conditions as $index => $condition ) {
-            $connector = ( $index === 0 ) ? '' : " {$condition['boolean']} ";
+            $connector = ( $index === 0 ) ? '' : ' ' . $this->connector( $condition['boolean'] ) . ' ';
 
             $clause = match ( $condition['type'] ) {
                 // Column-to-Column Comparison (Both sides securely identifier-quoted)
                 'OnColumn' => sprintf(
                     "%s %s %s",
                     $this->quote_identifier( $condition['first_column'] ),
-                    $condition['operator'],
+                    $this->comparison_operator( $condition['operator'] ),
                     $this->quote_identifier( $condition['second_column'] )
                 ),
                 
@@ -713,7 +734,7 @@ abstract class AbstractQueryRenderer {
                 'OnValue' => sprintf(
                     "%s %s ?",
                     $this->quote_identifier( $condition['column'] ),
-                    $condition['operator']
+                    $this->comparison_operator( $condition['operator'] )
                 ),
                 
                 // Pure Nullability inspection states
@@ -759,10 +780,74 @@ abstract class AbstractQueryRenderer {
                 : $this->quote_identifier( $order['column'] );
 
             // Append the direction identifier (ASC / DESC) right on the trailing edge
-            $parts[] = $sort_target . ' ' . $order['direction'];
+            $parts[] = $sort_target . ' ' . $this->sort_direction( $order['direction'] );
         }
         
         return ' ORDER BY ' . implode( ', ', $parts );
+    }
+
+    /*
+    |------------------
+    | KEYWORD CHECKING
+    |------------------
+    */
+
+    /**
+     * The canonical form of a comparison operator.
+     *
+     * @param string $operator As given, in any letter case and spacing.
+     * @return string One of COMPARISON_OPERATORS.
+     * @throws \InvalidArgumentException When the operator is not in COMPARISON_OPERATORS.
+     */
+    protected function comparison_operator( string $operator ) : string {
+        return $this->keyword( $operator, self::COMPARISON_OPERATORS, 'comparison operator' );
+    }
+
+    /**
+     * The canonical form of a sort direction.
+     *
+     * @param string $direction As given, in any letter case.
+     * @return string ASC or DESC.
+     * @throws \InvalidArgumentException When the direction is not ASC or DESC.
+     */
+    protected function sort_direction( string $direction ) : string {
+        return $this->keyword( $direction, self::SORT_DIRECTIONS, 'sort direction' );
+    }
+
+    /**
+     * The canonical form of a logical connector.
+     *
+     * @param string $connector As given, in any letter case.
+     * @return string AND or OR.
+     * @throws \InvalidArgumentException When the connector is not AND or OR.
+     */
+    protected function connector( string $connector ) : string {
+        return $this->keyword( $connector, self::CONNECTORS, 'logical connector' );
+    }
+
+    /**
+     * Normalise a keyword and check it against a closed list.
+     *
+     * The keyword is upper-cased, trimmed and its inner whitespace collapsed,
+     * so 'not  like' matches 'NOT LIKE'. The canonical form from the list is
+     * what gets written, never the input.
+     *
+     * @param string   $keyword The keyword as given.
+     * @param string[] $allowed The closed list.
+     * @param string   $kind    What the keyword is, for the error message.
+     * @return string
+     * @throws \InvalidArgumentException When the keyword is not in the list.
+     */
+    private function keyword( string $keyword, array $allowed, string $kind ) : string {
+        $normalized = strtoupper( (string) preg_replace( '/\s+/', ' ', trim( $keyword ) ) );
+
+        if ( ! in_array( $normalized, $allowed, true ) ) {
+            throw new \InvalidArgumentException(
+                sprintf( 'Unsupported %s "%s": use one of %s.', $kind, $keyword, implode( ', ', $allowed ) )
+            );
+        }
+
+        return $normalized;
     }
 
     /**
