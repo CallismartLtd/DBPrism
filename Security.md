@@ -35,7 +35,8 @@ These are DBPrism's security guarantees. A way around any of them is a vulnerabi
 
 - **Values are always bound.** Values passed to the query builder (`where()` values, `insert()` and `update()` data) and to the `Database` query methods are sent as bound parameters, never written into the SQL text.
 - **Identifiers are quoted.** Table and column names are quoted for the engine, with quote characters inside them escaped.
-- **Operators and sort directions are checked.** Comparison operators and `ASC` / `DESC` are checked against a fixed list; anything else throws.
+- **The `Database` CRUD helpers take names only.** The table and the array keys given to `insert()`, `update()` and `delete()` must be plain names (letters, digits and underscores; a table may have one schema prefix, as in `schema.table`). They are quoted for the engine, and anything else throws `InvalidArgumentException` before the statement is built, so passing request data such as `$_POST` as the data array cannot change the SQL.
+- **Operators, sort directions and connectors are checked.** They are the only parts of a condition written into the SQL as given, so each must come from a fixed list: the comparison operators `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `LIKE` and `NOT LIKE`, the directions `ASC` and `DESC`, and the connectors `AND` and `OR`. Anything else throws `InvalidArgumentException` when the query is built.
 - **Search terms match literally.** `where_contains()`, `where_starts_with()`, `where_ends_with()` and `where_like()` escape `%` and `_` inside the term.
 - **Connection settings cannot rewrite the DSN.** `DsnBuilder` rejects a `;` in any value it writes into a DSN.
 - **Migration table names are checked.** The `Migrator`'s table prefix must be letters, digits and underscores.
@@ -44,7 +45,7 @@ These are DBPrism's security guarantees. A way around any of them is a vulnerabi
 
 Some input is treated as SQL, on purpose. Problems that come from passing untrusted input into it are not vulnerabilities in DBPrism:
 
-- **Table and column names.** A name that looks like an SQL expression (`COUNT(*)`, `orders.total * 2`) is written as given. Never build names from user input; map the user's choice to a fixed list of names instead.
+- **Table and column names in the query builder.** A name that looks like an SQL expression (`COUNT(*)`, `orders.total * 2`) is written as given. Never build names from user input; map the user's choice to a fixed list of names instead.
 - **Raw SQL.** `select_raw()`, `where_raw()`, `exec()`, `DefaultColumnValue::expression()` and `SQLExpression` are written as given. Only their bound values (`where_raw( $sql, $bindings )`) are safe for user input.
 - **`build_raw()`.** It writes the bindings into the SQL for reading and logging. Its output is not escaped for execution and must never be run.
 - **Configuration.** Database credentials, DSNs and adapter settings are trusted.
