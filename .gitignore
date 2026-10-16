@@ -4,3 +4,4 @@
 .phpunit.xml
 *.db
 test.php
+msg.txt
