@@ -34,6 +34,7 @@ use Throwable;
  *   $migrator->revert();    // undoes the most recent run
  *   $migrator->status();    // what is applied and what is pending
  *   $migrator->baseline();  // on a fresh installation: records all as applied
+ *   $migrator->has_ledger(); // whether migrations are managed on this database yet
  *```
  * Rules:
  *
@@ -277,6 +278,22 @@ class Migrator {
 
 			return $done;
 		} );
+	}
+
+	/**
+	 * Whether the database has a migration ledger. Changes nothing.
+	 *
+	 * The ledger exists once baseline() or migrate() has run on the database.
+	 * An installer uses it to tell a database it manages from one it has
+	 * never seen: without a ledger, a database holding none of the
+	 * application's tables is fresh (baseline()), and one holding them
+	 * predates the ledger (migrate()).
+	 *
+	 * @return bool
+	 * @throws MigrationException When the database cannot be asked, e.g. it is unreachable.
+	 */
+	public function has_ledger() : bool {
+		return $this->ledger->exists();
 	}
 
 	/**
