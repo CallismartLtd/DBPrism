@@ -1,31 +1,17 @@
-## DBPrism 2.4.2
-
-This is a security release. All users of 2.4.0 and earlier should upgrade.
-
-### Security
-
-**SQL injection through operators, sort directions and connectors.** The query builder wrote these into the SQL exactly as given. An application passing request data as the operator of `where()`, `having()` or a join, as the direction of `order_by()`, or as the connector of a condition allowed an attacker to change the query. They are now checked against a fixed list:
-
-- comparison operators: `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `LIKE`, `NOT LIKE`
-- sort directions: `ASC`, `DESC`
-- connectors: `AND`, `OR`
-
-Case and extra spaces are accepted (`'not   like'` is written as `NOT LIKE`). Anything else throws `InvalidArgumentException` when the query is built.
-
-**SQL injection through `insert()`, `update()` and `delete()` array keys.** The adapters wrote the table name and the keys of the data and where arrays into the SQL exactly as given. An application passing request data as the array, such as `$db->update( 'users', $_POST, [ 'id' => $id ] )`, allowed an attacker to set other columns or widen the WHERE clause to every row. The table and every key must now be a plain name: letters, digits and underscores, with one optional schema prefix for the table (`schema.table`). Valid names are quoted for the engine; anything else throws `InvalidArgumentException` before the statement is built.
-
-### Changes you may notice
-
-- `where( 'col', 'IS', null )` and other operators outside the list now throw. Use `where_null()` and `where_not_null()`.
-- `insert()`, `update()` and `delete()` now quote table and column names, as the query builder already did. Reserved words such as `order` now work as column names. On PostgreSQL, quoted names are case-sensitive, so a mixed-case name like `UserId` no longer matches a column created unquoted (stored as `userid`).
-- An expression used as a key in these three methods now throws. Use the query builder for expressions.
-
-### Fixed
-
-- `right_join()` called without an operator threw a PHP `TypeError` instead of `InvalidArgumentException`, unlike `join()` and `left_join()`.
-- `SqliteAdapter` opened databases read-only when `flags` was malformed.
+## [2.5.0] - 2026-10-17
 
 ### Added
+- `SQLBuilder::upsert()` and `UpsertIntent`: an INSERT that updates the existing row when a row conflicts on a unique key. `on_conflict()` names the key (required); `update_columns()` limits which columns are updated. Works with `values()` and `multi_values()`. Renders `ON CONFLICT ... DO UPDATE` on PostgreSQL and SQLite (3.24+), and `ON DUPLICATE KEY UPDATE` on MySQL and MariaDB.
+- `Migrator::baseline()`: records every registered migration as applied without running it, for fresh installations that create the current schema directly. Only runs on a database without a ledger. Baselined migrations are recorded as run 0 and are never reverted.
+- `Migrator::has_ledger()`: whether the database has a migration ledger yet.
+- `Callismart\DBPrism\Exceptions\QueryException`, the base of exceptions the query builder throws when it refuses a query, with `UpsertException` and `PersistenceDataException`. All extend `InvalidArgumentException`.
 
-- A security test suite (`composer test:security`) covering value binding, identifier quoting, the input guards and injection against a live database.
-- `SECURITY.md`, describing DBPrism's security guarantees and how to report a vulnerability.
+### Changed
+- `PersistenceIntent` now throws `PersistenceDataException` where it threw `InvalidArgumentException`. Existing `catch ( InvalidArgumentException )` blocks still catch it.
+- `multi_values()` requires every row to have the same columns as the first row, and stores each row in the first row's column order.
+
+### Fixed
+- A `DefaultColumnValue` in `values()` or `set()` was rendered as a placeholder but never bound, so the bindings after it shifted by one place. In an UPDATE this wrote the WHERE value into the column and left the WHERE placeholder unbound. It is now written into the SQL.
+- `multi_values()` silently paired values with the wrong columns when a row listed its columns in a different order than the first row.
+- `set_case()` on an INSERT now throws when the query is built, as documented, instead of rendering a placeholder that did not match the bindings.
+
