@@ -13,7 +13,7 @@ namespace Callismart\DBPrism\Query\QueryIntents;
 use Callismart\DBPrism\Query\SQLBuilder;
 use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Query\Traits\QueryCriteriaTrait;
-use InvalidArgumentException;
+use Callismart\DBPrism\Exceptions\PersistenceDataException;
 use Callismart\DBPrism\Query\Traits\SQLBuilderStrategyTrait;
 use Callismart\DBPrism\Query\Traits\SupportsUnionsTrait;
 use Callismart\DBPrism\Utils\CaseExpression;
@@ -73,13 +73,13 @@ class PersistenceIntent implements QueryIntentInterface {
      * 
      * @param array $data Column => Value pairs.
      * @return static
-     * @throws \InvalidArgumentException If a CaseExpression is supplied on 
+     * @throws PersistenceDataException If a CaseExpression is supplied on 
      * an operation that isn't an UPDATE.
      */
     public function values( array $data ) : static {
         foreach ( $data as $value ) {
             if ( $value instanceof CaseExpression ) {
-                throw new \InvalidArgumentException(
+                throw new PersistenceDataException(
                     "Symmetry Violation: CaseExpression cannot be passed directly into raw value sets. " .
                     "Use the dedicated 'set_case()' method to apply dynamic updates."
                 );
@@ -102,12 +102,13 @@ class PersistenceIntent implements QueryIntentInterface {
      *
      * @param array $rows Array of column => value arrays.
      * @return static
-     * @throws InvalidArgumentException When there is no row, a row is not an associative
-     *                                  array, or a row's columns differ from the first row's.
+     * @throws PersistenceDataException When there is no row, a row is not an associative
+     *                                  array or holds a CaseExpression, or a row's columns
+     *                                  differ from the first row's.
      */
     public function multi_values( array $rows ) : static {
         if ( empty( $rows ) ) {
-            throw new InvalidArgumentException( 'Multi-values intent requires at least one row.' );
+            throw new PersistenceDataException( 'Multi-values intent requires at least one row.' );
         }
 
         $columns = null;
@@ -116,12 +117,12 @@ class PersistenceIntent implements QueryIntentInterface {
         // Must be an array of associative arrays.
         foreach ( array_values( $rows ) as $index => $row ) {
             if ( ! is_array( $row ) || array_values( $row ) === $row ) {
-                throw new InvalidArgumentException( 'Each row in multi-values intent must be an associative array of column => value pairs.' );
+                throw new PersistenceDataException( 'Each row in multi-values intent must be an associative array of column => value pairs.' );
             }
 
             foreach ( $row as $value ) {
                 if ( $value instanceof CaseExpression ) {
-                    throw new InvalidArgumentException(
+                    throw new PersistenceDataException(
                         "Symmetry Violation: CaseExpression cannot be passed directly into raw value sets. " .
                         "Use the dedicated 'set_case()' method to apply dynamic updates."
                     );
@@ -131,7 +132,7 @@ class PersistenceIntent implements QueryIntentInterface {
             $columns ??= array_keys( $row );
 
             if ( count( $row ) !== count( $columns ) || [] !== array_diff_key( $row, array_flip( $columns ) ) ) {
-                throw new InvalidArgumentException(
+                throw new PersistenceDataException(
                     sprintf(
                         'Row %d has the columns (%s), but the first row has (%s). Every row must have the same columns.',
                         $index + 1,

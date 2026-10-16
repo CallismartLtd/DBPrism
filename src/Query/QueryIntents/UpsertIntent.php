@@ -10,7 +10,7 @@ declare( strict_types=1 );
 
 namespace Callismart\DBPrism\Query\QueryIntents;
 
-use InvalidArgumentException;
+use Callismart\DBPrism\Exceptions\UpsertException;
 
 /**
  * Represents an intent to insert rows that update the existing row on a key conflict (UPSERT).
@@ -61,11 +61,11 @@ final class UpsertIntent extends PersistenceIntent {
      *
      * @param string ...$columns The key's columns.
      * @return static
-     * @throws InvalidArgumentException When no column is given.
+     * @throws UpsertException When no column is given.
      */
     public function on_conflict( string ...$columns ) : static {
         if ( empty( $columns ) ) {
-            throw new InvalidArgumentException( 'on_conflict() needs the columns of the unique key the rows conflict on.' );
+            throw new UpsertException( 'on_conflict() needs the columns of the unique key the rows conflict on.' );
         }
 
         $this->conflict_columns = array_values( array_unique( array_map( 'trim', $columns ) ) );
@@ -82,11 +82,11 @@ final class UpsertIntent extends PersistenceIntent {
      *
      * @param string ...$columns Inserted columns to update.
      * @return static
-     * @throws InvalidArgumentException When no column is given.
+     * @throws UpsertException When no column is given.
      */
     public function update_columns( string ...$columns ) : static {
         if ( empty( $columns ) ) {
-            throw new InvalidArgumentException( 'update_columns() needs at least one column. To update every inserted column outside the conflict key, do not call it.' );
+            throw new UpsertException( 'update_columns() needs at least one column. To update every inserted column outside the conflict key, do not call it.' );
         }
 
         $this->update_columns = array_values( array_unique( array_map( 'trim', $columns ) ) );
@@ -100,10 +100,10 @@ final class UpsertIntent extends PersistenceIntent {
      * @param string   $column   Unused.
      * @param callable $callback Unused.
      * @return static
-     * @throws InvalidArgumentException Always.
+     * @throws UpsertException Always.
      */
     public function set_case( string $column, callable $callback ) : static {
-        throw new InvalidArgumentException( 'set_case() applies to update() queries only. An upsert updates each column to the value the row tried to insert.' );
+        throw new UpsertException( 'set_case() applies to update() queries only. An upsert updates each column to the value the row tried to insert.' );
     }
 
     /**

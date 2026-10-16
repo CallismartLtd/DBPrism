@@ -9,6 +9,8 @@
 
 namespace Callismart\DBPrism\Query\Renderers;
 
+use Callismart\DBPrism\Exceptions\PersistenceDataException;
+use Callismart\DBPrism\Exceptions\UpsertException;
 use Callismart\DBPrism\Query\QueryIntents\AlterTableIntent;
 use Callismart\DBPrism\Query\QueryIntents\CompoundQueryIntent;
 use Callismart\DBPrism\Query\QueryIntents\CreateTableIntent;
@@ -330,12 +332,13 @@ abstract class AbstractQueryRenderer {
      * @param UpsertIntent $intent
      * @return string
      * @throws \RuntimeException         When there is no data.
-     * @throws \InvalidArgumentException When the conflict key is missing or not inserted, an
+     * @throws UpsertException          When the conflict key is missing or not inserted, an
      *                                   update column is not inserted, or the query has WHERE conditions.
+     * @throws PersistenceDataException  When a value is a CASE expression from set_case().
      */
     public function render_upsert( UpsertIntent $intent ) : string {
         if ( ! empty( $intent->get_conditions() ) ) {
-            throw new \InvalidArgumentException( 'Cannot render UPSERT: it takes no WHERE conditions. The conflict key (on_conflict()) chooses the row to update.' );
+            throw new UpsertException( 'Cannot render UPSERT: it takes no WHERE conditions. The conflict key (on_conflict()) chooses the row to update.' );
         }
 
         $sql      = $this->render_insert_rows( $intent, 'UPSERT' );
@@ -344,20 +347,20 @@ abstract class AbstractQueryRenderer {
         $conflict = $intent->get_conflict_columns();
 
         if ( empty( $conflict ) ) {
-            throw new \InvalidArgumentException( 'Cannot render UPSERT: call on_conflict() with the unique key the rows conflict on.' );
+            throw new UpsertException( 'Cannot render UPSERT: call on_conflict() with the unique key the rows conflict on.' );
         }
 
         $missing = array_diff( $conflict, $columns );
 
         if ( ! empty( $missing ) ) {
-            throw new \InvalidArgumentException( sprintf( 'Cannot render UPSERT: the conflict key column(s) %s must be inserted.', implode( ', ', $missing ) ) );
+            throw new UpsertException( sprintf( 'Cannot render UPSERT: the conflict key column(s) %s must be inserted.', implode( ', ', $missing ) ) );
         }
 
         $update  = $intent->get_update_columns() ?? array_values( array_diff( $columns, $conflict ) );
         $unknown = array_diff( $update, $columns );
 
         if ( ! empty( $unknown ) ) {
-            throw new \InvalidArgumentException( sprintf( 'Cannot render UPSERT: update column(s) %s must be inserted, since each takes the inserted value.', implode( ', ', $unknown ) ) );
+            throw new UpsertException( sprintf( 'Cannot render UPSERT: update column(s) %s must be inserted, since each takes the inserted value.', implode( ', ', $unknown ) ) );
         }
 
         return $sql . $this->render_conflict_clause( $conflict, $update ) . ';';
@@ -400,7 +403,7 @@ abstract class AbstractQueryRenderer {
      * @param string            $statement The statement being rendered, for error messages.
      * @return string
      * @throws \RuntimeException         When there is no data.
-     * @throws \InvalidArgumentException When a value is a CaseExpression (set_case() is for UPDATE).
+     * @throws PersistenceDataException  When a value is a CaseExpression (set_case() is for UPDATE).
      */
     protected function render_insert_rows( PersistenceIntent $intent, string $statement ) : string {
         $table = $this->quote_identifier( $intent->get_table_name() );
@@ -417,7 +420,7 @@ abstract class AbstractQueryRenderer {
         foreach ( $rows as $row ) {
             foreach ( $row as $column => $value ) {
                 if ( $value instanceof CaseExpression ) {
-                    throw new \InvalidArgumentException( "Cannot render {$statement}: set_case() applies to UPDATE only, but column {$column} has a CASE expression." );
+                    throw new PersistenceDataException( "Cannot render {$statement}: set_case() applies to UPDATE only, but column {$column} has a CASE expression." );
                 }
             }
 
