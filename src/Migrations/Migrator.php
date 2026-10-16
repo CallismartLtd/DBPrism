@@ -24,7 +24,7 @@ use Throwable;
  * names. That list is the whole definition: a migration's name is its class
  * name, and its order is its place in the list. Nothing is discovered by
  * scanning directories or reading file names.
- *
+ * @example ```php
  *   $migrator = new Migrator( $db, [
  *       CreateLicensesTable::class,
  *       AddLicenseKeyIndex::class,
@@ -34,7 +34,7 @@ use Throwable;
  *   $migrator->revert();    // undoes the most recent run
  *   $migrator->status();    // what is applied and what is pending
  *   $migrator->baseline();  // on a fresh installation: records all as applied
- *
+ *```
  * Rules:
  *
  *  - New migrations go at the end of the list. A pending migration listed
