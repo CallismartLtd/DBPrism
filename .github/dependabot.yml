@@ -1,0 +1,22 @@
+# Dependabot: weekly update checks for Composer packages and GitHub Actions.
+#
+# For a "library" composer.json, Dependabot widens constraints (adds the new
+# version beside the old one) rather than raising the minimum, so users on
+# older versions are not cut off.
+
+version: 2
+updates:
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"

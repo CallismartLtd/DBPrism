@@ -1,0 +1,163 @@
+# Tests: every suite, and a syntax check on every PHP version composer.json
+# supports.
+#
+# PHPUnit 13 needs PHP 8.4.1 or later, so the suites run on 8.4 and 8.5.
+# PHP 8.1 to 8.3 are covered by a syntax check of src/ only: it catches
+# syntax those versions lack, not differences in runtime behaviour.
+#
+# The Connection suite runs against real servers: once with MySQL and once
+# with MariaDB, each beside PostgreSQL. The servers accept both sets of
+# default credentials the connection tests fall back to (root with no
+# password, and dbprism_test / dbprism_test), and every variable the tests
+# read is also set explicitly.
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suites:
+    name: PHP ${{ matrix.php }} suites
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ "8.4", "8.5" ]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: sqlite3, pdo_sqlite
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Intent tests
+        run: composer test:intent
+
+      - name: Renderer tests
+        run: composer test:renderer
+
+      - name: Utils tests
+        run: composer test:utils
+
+      - name: Security tests
+        run: composer test:security
+
+  connection:
+    name: Connection suite (${{ matrix.mysql.name }}, PostgreSQL)
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql:
+          - name: "MySQL 8.4"
+            image: "mysql:8.4"
+            health: "mysqladmin ping -h 127.0.0.1 --silent"
+          - name: "MariaDB 11.4"
+            image: "mariadb:11.4"
+            health: "healthcheck.sh --connect --innodb_initialized"
+
+    services:
+      mysql:
+        image: ${{ matrix.mysql.image }}
+        env:
+          # The MariaDB image accepts these MYSQL_* names too.
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: dbprism_test
+          MYSQL_USER: dbprism_test
+          MYSQL_PASSWORD: dbprism_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="${{ matrix.mysql.health }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: dbprism_test
+          POSTGRES_USER: dbprism_test
+          POSTGRES_PASSWORD: dbprism_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U dbprism_test -d dbprism_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      MYSQL_HOST: "127.0.0.1"
+      MYSQL_PORT: "3306"
+      MYSQL_USER: dbprism_test
+      MYSQL_PASS: dbprism_test
+      MYSQL_DB: dbprism_test
+      MYSQL_NAME: dbprism_test
+      PGSQL_HOST: "127.0.0.1"
+      PGSQL_PORT: "5432"
+      PGSQL_USER: dbprism_test
+      PGSQL_PASS: dbprism_test
+      PGSQL_DB: dbprism_test
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mysqli, pdo_mysql, pdo_pgsql, sqlite3, pdo_sqlite
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Connection tests
+        run: composer test:connection
+
+  syntax:
+    name: PHP ${{ matrix.php }} syntax
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ "8.1", "8.2", "8.3" ]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Check the syntax of src/
+        run: |
+          status=0
+          while IFS= read -r -d '' file; do
+            php -l "$file" > /dev/null || status=1
+          done < <( find src -name '*.php' -print0 )
+          exit $status
