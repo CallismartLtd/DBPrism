@@ -17,6 +17,7 @@ use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
 use Callismart\DBPrism\Query\QueryIntents\QueryIntentInterface;
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\UpsertIntent;
 use Callismart\DBPrism\Query\Traits\ColumnNormalizerTrait;
 use Callismart\DBPrism\Utils\CaseExpression;
 use Callismart\DBPrism\Utils\Column;
@@ -316,28 +317,135 @@ abstract class AbstractQueryRenderer {
      * @return string
      */
     public function render_insert( PersistenceIntent $intent ) : string {
+        return $this->render_insert_rows( $intent, 'INSERT' ) . ';';
+    }
+
+    /**
+     * Render an UPSERT: an INSERT whose rows update the existing row on a key conflict.
+     *
+     * The rows are written as render_insert() writes them; the engine's
+     * conflict clause follows (render_conflict_clause()). Bindings are the
+     * inserted values only: each update reads the value the row tried to insert.
+     *
+     * @param UpsertIntent $intent
+     * @return string
+     * @throws \RuntimeException         When there is no data.
+     * @throws \InvalidArgumentException When the conflict key is missing or not inserted, an
+     *                                   update column is not inserted, or the query has WHERE conditions.
+     */
+    public function render_upsert( UpsertIntent $intent ) : string {
+        if ( ! empty( $intent->get_conditions() ) ) {
+            throw new \InvalidArgumentException( 'Cannot render UPSERT: it takes no WHERE conditions. The conflict key (on_conflict()) chooses the row to update.' );
+        }
+
+        $sql      = $this->render_insert_rows( $intent, 'UPSERT' );
+        $data     = $intent->get_data();
+        $columns  = array_keys( $intent->is_multi() ? $data[0] : $data );
+        $conflict = $intent->get_conflict_columns();
+
+        if ( empty( $conflict ) ) {
+            throw new \InvalidArgumentException( 'Cannot render UPSERT: call on_conflict() with the unique key the rows conflict on.' );
+        }
+
+        $missing = array_diff( $conflict, $columns );
+
+        if ( ! empty( $missing ) ) {
+            throw new \InvalidArgumentException( sprintf( 'Cannot render UPSERT: the conflict key column(s) %s must be inserted.', implode( ', ', $missing ) ) );
+        }
+
+        $update  = $intent->get_update_columns() ?? array_values( array_diff( $columns, $conflict ) );
+        $unknown = array_diff( $update, $columns );
+
+        if ( ! empty( $unknown ) ) {
+            throw new \InvalidArgumentException( sprintf( 'Cannot render UPSERT: update column(s) %s must be inserted, since each takes the inserted value.', implode( ', ', $unknown ) ) );
+        }
+
+        return $sql . $this->render_conflict_clause( $conflict, $update ) . ';';
+    }
+
+    /**
+     * The clause that turns an INSERT into an UPSERT.
+     *
+     * SQL standard form, used by PostgreSQL and SQLite (3.24 and later):
+     * ON CONFLICT (key) DO UPDATE SET col = EXCLUDED.col, or DO NOTHING when
+     * no column is updated. MySQLRenderer overrides it.
+     *
+     * @param string[] $conflict The conflict key's columns.
+     * @param string[] $update   The columns to update; empty to leave the existing row as it is.
+     * @return string The clause, with a leading space.
+     */
+    protected function render_conflict_clause( array $conflict, array $update ) : string {
+        $target = implode( ', ', $this->quote_identifiers( $conflict ) );
+
+        if ( empty( $update ) ) {
+            return sprintf( ' ON CONFLICT (%s) DO NOTHING', $target );
+        }
+
+        $assignments = array_map(
+            fn( string $column ) : string => sprintf( '%1$s = EXCLUDED.%1$s', $this->quote_identifier( $column ) ),
+            $update
+        );
+
+        return sprintf( ' ON CONFLICT (%s) DO UPDATE SET %s', $target, implode( ', ', $assignments ) );
+    }
+
+    /**
+     * Render INSERT INTO table (columns) VALUES (row), ... without the terminator.
+     *
+     * Shared by INSERT and UPSERT. Each value is a placeholder, except a
+     * DefaultColumnValue, which is written into the SQL (see value_sql()),
+     * matching PersistenceIntent::get_bindings().
+     *
+     * @param PersistenceIntent $intent
+     * @param string            $statement The statement being rendered, for error messages.
+     * @return string
+     * @throws \RuntimeException         When there is no data.
+     * @throws \InvalidArgumentException When a value is a CaseExpression (set_case() is for UPDATE).
+     */
+    protected function render_insert_rows( PersistenceIntent $intent, string $statement ) : string {
         $table = $this->quote_identifier( $intent->get_table_name() );
         $data  = $intent->get_data();
 
         if ( empty( $data ) ) {
-            throw new \RuntimeException( "Cannot render INSERT: No data provided." );
+            throw new \RuntimeException( "Cannot render {$statement}: No data provided." );
         }
 
-        $first_row = $intent->is_multi() ? $data[0] : $data;
-        $columns   = array_keys( $first_row );
-        $quoted_cols = implode( ', ', array_map( [ $this, 'quote_identifier' ], $columns ) );
+        $rows        = $intent->is_multi() ? $data : [ $data ];
+        $quoted_cols = implode( ', ', $this->quote_identifiers( array_keys( $rows[0] ) ) );
 
-        if ( $intent->is_multi() ) {
-            $row_placeholders = [];
-            foreach ( $data as $row ) {
-                $row_placeholders[] = '(' . implode( ', ', array_fill( 0, count( $row ), '?' ) ) . ')';
+        $row_values = [];
+        foreach ( $rows as $row ) {
+            foreach ( $row as $column => $value ) {
+                if ( $value instanceof CaseExpression ) {
+                    throw new \InvalidArgumentException( "Cannot render {$statement}: set_case() applies to UPDATE only, but column {$column} has a CASE expression." );
+                }
             }
-            $values_clause = implode( ', ', $row_placeholders );
-        } else {
-            $values_clause = '(' . implode( ', ', array_fill( 0, count( $data ), '?' ) ) . ')';
+
+            $row_values[] = '(' . implode( ', ', array_map( [ $this, 'value_sql' ], array_values( $row ) ) ) . ')';
         }
 
-        return sprintf( "INSERT INTO %s (%s) VALUES %s;", $table, $quoted_cols, $values_clause );
+        return sprintf( "INSERT INTO %s (%s) VALUES %s", $table, $quoted_cols, implode( ', ', $row_values ) );
+    }
+
+    /**
+     * The SQL for a value in an INSERT, UPSERT or UPDATE SET.
+     *
+     * A placeholder, except a DefaultColumnValue, which is never bound (see
+     * PersistenceIntent::should_bind_value()) and so is written into the
+     * SQL: an expression as given, with [name] tokens quoted for the engine
+     * (see parse_agnostic_expression()); a literal quoted as one.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    protected function value_sql( mixed $value ) : string {
+        if ( ! $value instanceof DefaultColumnValue ) {
+            return '?';
+        }
+
+        return $value->is_expression()
+            ? $this->parse_agnostic_expression( (string) $value )
+            : $this->format_literal( $value->value() );
     }
 
     /**
@@ -358,8 +466,8 @@ abstract class AbstractQueryRenderer {
                 // If the payload value is a CaseExpression DTO, render its compiled string.
                 $set_parts[] = sprintf( "%s = %s", $quoted_column, $this->render_case_expression( $value ) );
             } else {
-                // Standard plain parameter assignment token.
-                $set_parts[] = sprintf( "%s = ?", $quoted_column );
+                // A placeholder, or a DefaultColumnValue written into the SQL.
+                $set_parts[] = sprintf( "%s = %s", $quoted_column, $this->value_sql( $value ) );
             }
         }
 

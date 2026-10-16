@@ -21,9 +21,10 @@ use Callismart\DBPrism\Utils\DefaultColumnValue;
 
 /**
  * Represents an intent to persist or modify data (INSERT/UPDATE).
- * 
+ *
  * Encapsulates the dataset and column mappings for DML operations.
- * 
+ * UpsertIntent extends it for an INSERT that updates on a key conflict.
+ *
  * @since 0.2.0
  */
 class PersistenceIntent implements QueryIntentInterface {
@@ -94,18 +95,26 @@ class PersistenceIntent implements QueryIntentInterface {
 
     /**
      * Set data for multiple rows (Bulk Insert).
-     * 
+     *
+     * Every row must have the same columns as the first row; a row may list
+     * them in any order, and is stored in the first row's order, so each
+     * value lines up with its column.
+     *
      * @param array $rows Array of column => value arrays.
      * @return static
-     * @throws InvalidArgumentException
+     * @throws InvalidArgumentException When there is no row, a row is not an associative
+     *                                  array, or a row's columns differ from the first row's.
      */
     public function multi_values( array $rows ) : static {
         if ( empty( $rows ) ) {
             throw new InvalidArgumentException( 'Multi-values intent requires at least one row.' );
         }
 
+        $columns = null;
+        $ordered = [];
+
         // Must be an array of associative arrays.
-        foreach ( $rows as $row ) {
+        foreach ( array_values( $rows ) as $index => $row ) {
             if ( ! is_array( $row ) || array_values( $row ) === $row ) {
                 throw new InvalidArgumentException( 'Each row in multi-values intent must be an associative array of column => value pairs.' );
             }
@@ -118,10 +127,25 @@ class PersistenceIntent implements QueryIntentInterface {
                     );
                 }
             }
+
+            $columns ??= array_keys( $row );
+
+            if ( count( $row ) !== count( $columns ) || [] !== array_diff_key( $row, array_flip( $columns ) ) ) {
+                throw new InvalidArgumentException(
+                    sprintf(
+                        'Row %d has the columns (%s), but the first row has (%s). Every row must have the same columns.',
+                        $index + 1,
+                        implode( ', ', array_keys( $row ) ),
+                        implode( ', ', $columns )
+                    )
+                );
+            }
+
+            $ordered[] = array_replace( array_flip( $columns ), $row );
         }
 
         $this->is_multi = true;
-        $this->data     = array_merge( $this->data, $rows );
+        $this->data     = array_merge( $this->data, $ordered );
 
         return $this;
     }

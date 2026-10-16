@@ -15,6 +15,7 @@ use Callismart\DBPrism\Query\QueryIntents\DeleteIntent;
 use Callismart\DBPrism\Query\QueryIntents\PersistenceIntent;
 use Callismart\DBPrism\Query\QueryIntents\SelectionIntent;
 use Callismart\DBPrism\Query\QueryIntents\TruncateTableIntent;
+use Callismart\DBPrism\Query\QueryIntents\UpsertIntent;
 use Callismart\DBPrism\Query\Renderers\AbstractQueryRenderer;
 use Callismart\DBPrism\Query\Renderers\MySQLRenderer;
 use Callismart\DBPrism\Query\Renderers\PostgreSQLRenderer;
@@ -181,6 +182,25 @@ class SQLBuilder {
     }
 
     /**
+     * Start an UPSERT: an INSERT that updates the existing row on a unique key conflict.
+     *
+     * Takes rows like insert() (values() or multi_values()), plus the
+     * conflict key (on_conflict(), required) and, optionally, the columns to
+     * update (update_columns()). See UpsertIntent.
+     *
+     * @param string $table Table name (raw, unquoted)
+     * @return UpsertIntent
+     */
+    public function upsert( string $table ) : UpsertIntent {
+        $this->reset_intent();
+        $this->type          = 'UPSERT';
+        $this->table         = $table;
+        $this->active_intent = UpsertIntent::make( $table, $this );
+
+        return $this->active_intent;
+    }
+
+    /**
      * Start a DELETE query.
      *
      * @param string $table Table name (raw, unquoted)
@@ -323,6 +343,7 @@ class SQLBuilder {
             'SELECT'            => $renderer->render_select( $this->active_intent ),
             'INSERT'            => $renderer->render_insert( $this->active_intent ),
             'UPDATE'            => $renderer->render_update( $this->active_intent ),
+            'UPSERT'            => $renderer->render_upsert( $this->active_intent ),
             'DELETE'            => $renderer->render_delete( $this->active_intent ),
             'CREATE TABLE'      => $renderer->render_create_table( $this->active_intent ),
             'ALTER TABLE'       => $renderer->render_alter_table( $this->active_intent ),

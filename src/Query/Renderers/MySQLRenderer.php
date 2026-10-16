@@ -40,6 +40,29 @@ class MySQLRenderer extends AbstractQueryRenderer {
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * ON DUPLICATE KEY UPDATE col = VALUES(col). MySQL and MariaDB take no
+     * conflict target: a conflict with any unique key of the table updates
+     * the row. VALUES(col) reads the value the row tried to insert; MySQL
+     * 8.0.20 deprecated it in favour of a row alias, which MariaDB does not
+     * support, and both still accept it. With no column to update, the
+     * first key column is set to itself, which leaves the row as it is.
+     */
+    protected function render_conflict_clause( array $conflict, array $update ) : string {
+        if ( empty( $update ) ) {
+            return sprintf( ' ON DUPLICATE KEY UPDATE %1$s = %1$s', $this->quote_identifier( $conflict[0] ) );
+        }
+
+        $assignments = array_map(
+            fn( string $column ) : string => sprintf( '%1$s = VALUES(%1$s)', $this->quote_identifier( $column ) ),
+            $update
+        );
+
+        return ' ON DUPLICATE KEY UPDATE ' . implode( ', ', $assignments );
+    }
+
+    /**
      * Render CREATE TABLE.
      */
     public function render_create_table( CreateTableIntent $intent ) : string {
