@@ -29,6 +29,7 @@ Write a query once and run it on MySQL, MariaDB, PostgreSQL or SQLite. A small P
   - [DROP TABLE](#drop-table)
 - [Schema Inspection](#schema-inspection)
 - [Migrations](#migrations)
+- [Backup and Restore](#backup-and-restore)
 - [Streaming Large Results](#streaming-large-results)
 - [Transactions](#transactions)
 - [Best Practices](#best-practices)
@@ -46,8 +47,9 @@ It is made of parts that work on their own. Use one, some or all of them:
 - **Database layer.** One API over the native drivers and PDO. It is optional, and it never asks to own your connection: an adapter can wrap the one your application already opened (see [Your Own Adapter](#your-own-adapter)).
 - **Schema inspection.** Reads tables, columns, indexes and constraints the same way on every engine.
 - **Migrations.** Ordered schema changes, recorded by each database, where every step is safe to run again. On SQLite, the changes its `ALTER TABLE` cannot make are done by rebuilding the table.
+- **Backup and restore.** A consistent backup of a database to a portable file, which restores into any supported engine, all or nothing.
 
-Inspection and migrations run on the database layer; the query builder needs nothing else.
+Inspection, migrations and backups run on the database layer; the query builder needs nothing else.
 
 Inside, each layer has one job:
 
@@ -727,6 +729,7 @@ use Callismart\DBPrism\Utils\ColumnType;
 ->type( ColumnType::UUID )
 ->type( ColumnType::BINARY )->size( 16 )  // fixed length
 ->type( ColumnType::BLOB )
+->type( ColumnType::LONG_BLOB )           // LONGBLOB on MySQL; BYTEA and BLOB elsewhere
 ```
 
 Every column needs a type. Each type maps to the closest native type of the engine; SQLite stores them under its own type names (INTEGER, REAL, NUMERIC, TEXT, BLOB).
@@ -1148,6 +1151,80 @@ The prefix defaults to `dbprism_` and may contain letters, digits and underscore
 
 ---
 
+## Backup and Restore
+
+`BackupManager` writes a database to a portable backup file and restores one into a database. The backup does not depend on the engine: one taken from MySQL restores into PostgreSQL or SQLite, and the other way round.
+
+```php
+use Callismart\DBPrism\Backup\BackupManager;
+
+$backups = new BackupManager( $db );
+
+$report = $backups->backup( '/backups/app.dbprism.gz' );   // .gz: compressed
+$report->tables;      // [ 'users' => 1200, 'orders' => 56000, ... ]
+$report->checksum;    // SHA-256 of the backup
+$report->warnings;    // anything that could not be backed up exactly
+
+// Into another database, on any engine.
+$report = ( new BackupManager( $other_db ) )->restore( '/backups/app.dbprism.gz' );
+```
+
+### Consistency
+
+- **A backup is one snapshot.** Every table is read in one read-only transaction (`REPEATABLE READ` on PostgreSQL, `START TRANSACTION WITH CONSISTENT SNAPSHOT` on MySQL and MariaDB, a read transaction on SQLite), so the backup holds the database as it was at the moment it began, while other connections go on writing. On MySQL this covers InnoDB tables; a table on a storage engine without transactions (such as MyISAM) is named in the warnings. Pass `'consistent' => false` to read each table as it is. Run a backup outside your own transactions: the snapshot is a transaction of its own (and on MySQL, starting one commits any transaction already open).
+- **A restore is all or nothing.** On PostgreSQL and SQLite it is a single transaction, schema included. On MySQL, where `CREATE TABLE` commits on its own, each table is created and loaded under a staging name, and every table is moved into place with one atomic `RENAME TABLE` only once all rows are in. If the restore fails, the database is as it was.
+- **A damaged backup is never restored.** A backup ends with a checksum of its contents and the row count of every table. A backup that is truncated or altered is detected before the restore commits, and nothing is changed.
+- **A backup file is never half-written.** A backup is written to a temporary file that is renamed into place when it is complete.
+
+Restores load rows with their original IDs and then move each auto-increment sequence past them, so the next insert gets the next ID. Foreign keys are checked after all rows are loaded (or added then), so tables restore in any order.
+
+### What Is Backed Up
+
+Tables, with their columns (type, size, nullability, default, auto-increment, comment), primary keys, unique constraints, indexes, foreign keys with their `ON DELETE` and `ON UPDATE` actions, and all rows. Column types are recorded as [`ColumnType`](#column-types) types, so each engine creates the closest type of its own; values keep their exact form (decimals are never rounded, binary data is kept byte for byte).
+
+CHECK constraints and defaults that are engine expressions (other than `CURRENT_TIMESTAMP`, `CURRENT_DATE` and `CURRENT_TIME`) are restored on the engine they came from only. Views, triggers, stored routines, standalone sequences and users are not backed up. PostgreSQL backups cover the `public` schema.
+
+Whatever cannot be carried over exactly is listed in the report's `warnings`, never dropped silently. For example: MySQL `ENUM` columns become strings, and MySQL cannot index unbounded text, so a `TEXT` column in an index from another engine is created as a `VARCHAR`. SQLite stores declared types rather than types: DBPrism writes booleans, dates and times there as `INTEGER` and `TEXT`, so a database restored into SQLite and backed up again gives those columns as integers and text.
+
+### Options
+
+```php
+$backups->backup( $path, [
+    'tables'      => [ 'users', 'orders' ], // only these tables (default: all)
+    'exclude'     => [ 'sessions' ],        // leave these out
+    'data'        => true,                  // false: schema only
+    'consistent'  => true,                  // read every table from one snapshot
+    'compress'    => null,                  // gzip; null: when the path ends in .gz
+    'batch_size'  => 500,                   // rows per record in the file
+    'on_progress' => fn( string $table, int $rows ) => print( "{$table}: {$rows}\n" ),
+] );
+
+$backups->restore( $path, [
+    'existing'    => 'error',  // a table already exists: 'error' (refuse, change nothing),
+                               // 'replace' (drop it and restore the backed-up one), or
+                               // 'append' (keep it and insert the backed-up rows)
+    'tables'      => null,     // only these tables of the backup
+    'exclude'     => [],
+    'data'        => true,     // false: schema only
+    'batch_size'  => 500,      // rows per INSERT
+    'on_progress' => null,
+] );
+```
+
+With `'existing' => 'replace'`, foreign keys of other tables that reference a replaced table are kept, still pointing at it.
+
+Both methods also take an open stream instead of a path (for example to send a backup to cloud storage), which they leave open. Restore reads a backup as it goes, so memory use stays at one batch of rows however large the database is.
+
+`BackupManager::verify( $path )` reads a whole backup and checks its checksum and row counts without touching a database. It returns the backup's header (engine, time, tables), the rows of each table and the checksum.
+
+A failure throws `Callismart\DBPrism\Exceptions\BackupException`, whose message also says what state the database is in.
+
+### The Backup File
+
+A backup is a text file of JSON records, one per line: a header; one record per table with its portable definition; the rows of each table in batches, each table followed by its row count; and a footer with the SHA-256 of everything before it. Values are written by column type: integers and floats as numbers (integers beyond PHP's range as strings), decimals as strings, booleans as `true`/`false`, binary data as base64, and everything else as strings.
+
+---
+
 ## Streaming Large Results
 
 `stream()` reads a result one row at a time, so a large export never holds the whole result in memory. Every built-in adapter supports it.
@@ -1244,7 +1321,8 @@ Or one part of it:
 composer test:intent       # query intents
 composer test:renderer     # SQL rendering
 composer test:utils        # utilities
-composer test:connection   # live connection tests
+composer test:backup       # backup and restore on SQLite
+composer test:connection   # live connection tests, including backup and restore on MySQL, PostgreSQL and across engines
 
 composer test:dbconn:mysqli
 composer test:dbconn:pdo-mysql

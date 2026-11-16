@@ -36,6 +36,7 @@ final class ColumnType {
 
 	public const BINARY			= 20;
 	public const BLOB			= 21;
+	public const LONG_BLOB		= 22;
 
 	public const DATE			= 30;
 	public const TIME			= 31;
@@ -84,7 +85,7 @@ final class ColumnType {
 	public static function map( string $engine ): array {
 		return match ( $engine ) {
 			self::MYSQL		=> array(
-				self::BOOLEAN		=> 'TINYINT',
+				self::BOOLEAN		=> 'TINYINT(1)', // MySQL's BOOLEAN; the width marks the column as boolean.
 				self::SMALL_INT		=> 'SMALLINT',
 				self::INTEGER		=> 'INT',
 				self::BIG_INT		=> 'BIGINT',
@@ -99,6 +100,7 @@ final class ColumnType {
 
 				self::BINARY		=> 'BINARY',
 				self::BLOB			=> 'BLOB',
+				self::LONG_BLOB		=> 'LONGBLOB',
 
 				self::DATE			=> 'DATE',
 				self::TIME			=> 'TIME',
@@ -125,6 +127,7 @@ final class ColumnType {
 
 				self::BINARY		=> 'BYTEA',
 				self::BLOB			=> 'BYTEA',
+				self::LONG_BLOB		=> 'BYTEA',
 
 				self::DATE			=> 'DATE',
 				self::TIME			=> 'TIME',
@@ -151,6 +154,7 @@ final class ColumnType {
 
 				self::BINARY		=> 'BLOB',
 				self::BLOB			=> 'BLOB',
+				self::LONG_BLOB		=> 'BLOB',
 
 				self::DATE			=> 'TEXT',
 				self::TIME			=> 'TEXT',
