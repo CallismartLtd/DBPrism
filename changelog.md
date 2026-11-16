@@ -9,6 +9,7 @@
 - `ColumnType::BOOLEAN` is `TINYINT(1)` on MySQL (was `TINYINT`): MySQL's own spelling of a boolean, so a boolean column can be told from a small integer when the schema is read back. The stored values are the same.
 
 ### Fixed
+- Development: PHPUnit updated to 13.4.7, which fixes CVE-2026-119193 (reported by `composer audit`).
 - On SQLite, column sizes were not written: `size()` was ignored, so `DECIMAL` columns were declared `NUMERIC(10,2)` and strings `TEXT(255)` whatever their size. They are now declared with their size, as on MySQL and PostgreSQL. (SQLite does not enforce sizes; the declared size matters to inspection and to backups restored on other engines.)
 
 ## [2.5.0] - 2026-10-17

@@ -465,14 +465,33 @@ class MysqlBackupDialect extends AbstractBackupDialect {
 	/**
 	 * {@inheritdoc}
 	 *
-	 * MySQL (not MariaDB) refuses a literal DEFAULT on TEXT, BLOB and JSON columns.
+	 * MySQL (not MariaDB) accepts a DEFAULT on TEXT, BLOB and JSON columns only
+	 * when it is written as an expression, in parentheses (MySQL 8.0.13+):
+	 * DEFAULT ('new'), DEFAULT (CURRENT_TIMESTAMP).
 	 */
 	protected function adapt_column( TableSchema $schema, Column $column ) : Column {
-		$no_literal_default = in_array( $column->type, [ ColumnType::TEXT, ColumnType::LONG_TEXT, ColumnType::BLOB, ColumnType::LONG_BLOB, ColumnType::JSON ], true );
+		$expression_only = in_array( $column->type, [ ColumnType::TEXT, ColumnType::LONG_TEXT, ColumnType::BLOB, ColumnType::LONG_BLOB, ColumnType::JSON ], true );
 
-		if ( $no_literal_default && $column->default instanceof DefaultColumnValue && ! $column->default->is_expression() && ! $this->is_mariadb() ) {
-			$this->warn( sprintf( '%s.%s: MySQL does not allow a default on this column type; the default was not restored.', $schema->name(), $column->name ) );
+		if ( ! $expression_only || ! $column->default instanceof DefaultColumnValue || $this->is_mariadb() ) {
+			return $column;
+		}
+
+		$default = $column->default;
+
+		if ( $default->is_expression() ) {
+			$column->default = DefaultColumnValue::expression( '(' . $default . ')' );
+		} elseif ( ValueCodec::is_binary( $column ) ) {
+			$this->warn( sprintf( '%s.%s: MySQL does not allow a literal default on a binary column; the default was not restored.', $schema->name(), $column->name ) );
 			$column->default = null;
+		} else {
+			$value = $default->value();
+			$sql   = match ( true ) {
+				is_bool( $value )                   => $value ? '1' : '0',
+				is_int( $value ), is_float( $value ) => (string) $value,
+				default                             => "'" . str_replace( [ '\\', "'" ], [ '\\\\', "''" ], (string) $value ) . "'",
+			};
+
+			$column->default = DefaultColumnValue::expression( '(' . $sql . ')' );
 		}
 
 		return $column;
