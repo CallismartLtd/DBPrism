@@ -62,6 +62,7 @@
         "test:renderer": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Renderer Tests\"",
         "test:utils": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Utils Tests\"",
         "test:connection": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Connection Tests\"",
+        "test:backup": "phpunit --colors=always --testdox --display-warnings --display-deprecations --testsuite=\"DBPrism Backup Tests\"",
 
         "test:dbconn:mysqli": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=MysqliAdapterTest",
         "test:dbconn:pdo-mysql": "phpunit --colors=always --testdox --display-warnings --display-deprecations --filter=PdoMysqlTest",

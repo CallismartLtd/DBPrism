@@ -13,6 +13,10 @@
             <directory>tests/Utils</directory>
         </testsuite>
 
+        <testsuite name="DBPrism Backup Tests">
+            <directory>tests/Backup</directory>
+        </testsuite>
+
         <testsuite name="DBPrism Connection Tests">
             <directory>tests/Connection</directory>
         </testsuite>

@@ -263,7 +263,14 @@ class SQLiteRenderer extends AbstractQueryRenderer {
     protected function render_column_definition( Column $column ) : string {
         $this->require_column_type( $column );
 
-        $type = $this->normalize_type( $column->type );
+        // Sizes are written as declared, as on the other engines. SQLite does
+        // not enforce them, but keeps them in the table's definition, where
+        // inspection and backups read them back.
+        $type = $this->normalize_type( $column->type, [
+            'length'    => $column->length,
+            'scale'     => $column->scale,
+            'precision' => $column->precision,
+        ] );
 
         $parts = [ $this->quote_identifier( $column->name ), $type ];
 

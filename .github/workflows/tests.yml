@@ -58,6 +58,9 @@ jobs:
       - name: Security tests
         run: composer test:security
 
+      - name: Backup tests (SQLite)
+        run: composer test:backup
+
   connection:
     name: Connection suite (${{ matrix.mysql.name }}, PostgreSQL)
     runs-on: ubuntu-latest

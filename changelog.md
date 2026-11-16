@@ -1,3 +1,16 @@
+## [2.6.0] - Unreleased
+
+### Added
+- Backup and restore: `Callismart\DBPrism\Backup\BackupManager`. `backup()` writes a database to a portable backup file (gzip-compressed when the path ends in `.gz`), and `restore()` restores one into a database on any supported engine, whichever engine the backup came from. A backup reads every table from one snapshot; a restore is all or nothing (one transaction on PostgreSQL and SQLite; staged tables moved into place with one atomic `RENAME TABLE` on MySQL and MariaDB); a truncated or altered backup is refused before anything is committed. Backs up tables with their columns, primary keys, unique constraints, indexes, foreign keys and rows; restores move auto-increment sequences past the restored IDs. Options choose tables, schema only, and what to do with tables that already exist (`'existing' => 'error' | 'replace' | 'append'`). `BackupManager::verify()` checks a backup without a database. Anything that cannot be carried over exactly is reported as a warning.
+- `ColumnType::LONG_BLOB`: binary data larger than MySQL's `BLOB` (64 KB) holds. `LONGBLOB` on MySQL, `BYTEA` on PostgreSQL, `BLOB` on SQLite.
+- `Callismart\DBPrism\Exceptions\BackupException`, thrown when a backup or restore fails.
+
+### Changed
+- `ColumnType::BOOLEAN` is `TINYINT(1)` on MySQL (was `TINYINT`): MySQL's own spelling of a boolean, so a boolean column can be told from a small integer when the schema is read back. The stored values are the same.
+
+### Fixed
+- On SQLite, column sizes were not written: `size()` was ignored, so `DECIMAL` columns were declared `NUMERIC(10,2)` and strings `TEXT(255)` whatever their size. They are now declared with their size, as on MySQL and PostgreSQL. (SQLite does not enforce sizes; the declared size matters to inspection and to backups restored on other engines.)
+
 ## [2.5.0] - 2026-10-17
 
 ### Added
