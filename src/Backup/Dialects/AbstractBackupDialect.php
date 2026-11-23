@@ -71,10 +71,10 @@ abstract class AbstractBackupDialect {
 	 * The dialect for a database's engine.
 	 *
 	 * @param Database $db
-	 * @return self
+	 * @return static
 	 * @throws BackupException When the engine is not supported.
 	 */
-	public static function for( Database $db ) : self {
+	public static function for( Database $db ) : static {
 		return match ( $db->get_driver() ) {
 			'mysql'  => new MysqlBackupDialect( $db ),
 			'pgsql'  => new PostgresBackupDialect( $db ),
@@ -337,9 +337,7 @@ abstract class AbstractBackupDialect {
 		$builder = new SQLBuilder( $this->engine() );
 		$intent  = $builder->create_table( $as ?? $table->get_name() );
 
-		foreach ( $table->get_columns() as $column ) {
-			$intent->add_column( $column );
-		}
+		$intent->add_columns( $table->get_columns() );
 
 		foreach ( $table->get_constraints() as $constraint ) {
 			if ( 'foreign' !== $constraint->type || $this->inline_foreign_keys() ) {
@@ -586,7 +584,7 @@ abstract class AbstractBackupDialect {
 		if ( ! $this->db->exec( $sql ) ) {
 			throw new BackupException( sprintf(
 				'The database refused "%s": %s',
-				self::shorten( $sql ),
+				static::shorten( $sql ),
 				$this->db->get_last_error() ?? 'unknown error'
 			) );
 		}
@@ -603,7 +601,7 @@ abstract class AbstractBackupDialect {
 	protected function rows( string $sql, array $params = [] ) : array {
 		$rows = $this->db->get_results( $sql, $params );
 
-		$this->throw_on_error( sprintf( 'Reading "%s" failed', self::shorten( $sql ) ) );
+		$this->throw_on_error( sprintf( 'Reading "%s" failed', static::shorten( $sql ) ) );
 
 		return is_array( $rows ) ? array_map( fn( $row ) => array_change_key_case( (array) $row, CASE_LOWER ), $rows ) : [];
 	}
@@ -712,7 +710,7 @@ abstract class AbstractBackupDialect {
 			return;
 		}
 
-		$portable = self::portable_expression( (string) $value );
+		$portable = static::portable_expression( (string) $value );
 
 		if ( null !== $portable ) {
 			$column->default = DefaultColumnValue::expression( $portable );

@@ -142,26 +142,26 @@ class PostgresBackupDialect extends AbstractBackupDialect {
 		$default   = null === $row['column_default'] ? null : (string) $row['column_default'];
 
 		$column = match ( $data_type ) {
-			'boolean'                     => self::column( $name, ColumnType::BOOLEAN ),
-			'smallint'                    => self::column( $name, ColumnType::SMALL_INT ),
-			'integer'                     => self::column( $name, ColumnType::INTEGER ),
-			'bigint'                      => self::column( $name, ColumnType::BIG_INT ),
-			'numeric'                     => self::column( $name, ColumnType::DECIMAL, null, $precision, $scale ),
-			'real'                        => self::column( $name, ColumnType::FLOAT ),
-			'double precision'            => self::column( $name, ColumnType::DOUBLE ),
-			'character'                   => self::column( $name, ColumnType::CHAR, $length ),
-			'character varying'           => null === $length
+			'boolean'			=> self::column( $name, ColumnType::BOOLEAN ),
+			'smallint'			=> self::column( $name, ColumnType::SMALL_INT ),
+			'integer'			=> self::column( $name, ColumnType::INTEGER ),
+			'bigint'			=> self::column( $name, ColumnType::BIG_INT ),
+			'numeric'			=> self::column( $name, ColumnType::DECIMAL, null, $precision, $scale ),
+			'real'				=> self::column( $name, ColumnType::FLOAT ),
+			'double precision'	=> self::column( $name, ColumnType::DOUBLE ),
+			'character'			=> self::column( $name, ColumnType::CHAR, $length ),
+			'character varying'	=> null === $length
 				? self::column( $name, ColumnType::LONG_TEXT )
 				: self::column( $name, ColumnType::STRING, $length ),
-			'text'                        => self::column( $name, ColumnType::LONG_TEXT ),
-			'bytea'                       => self::column( $name, ColumnType::LONG_BLOB ),
-			'date'                        => self::column( $name, ColumnType::DATE ),
-			'time without time zone'      => self::column( $name, ColumnType::TIME ),
-			'timestamp without time zone' => self::column( $name, ColumnType::DATETIME ),
-			'timestamp with time zone'    => self::column( $name, ColumnType::TIMESTAMP ),
-			'json', 'jsonb'               => self::column( $name, ColumnType::JSON ),
-			'uuid'                        => self::column( $name, ColumnType::UUID ),
-			default                       => self::column( $name, ColumnType::LONG_TEXT ),
+			'text'							=> self::column( $name, ColumnType::LONG_TEXT ),
+			'bytea'							=> self::column( $name, ColumnType::LONG_BLOB ),
+			'date'							=> self::column( $name, ColumnType::DATE ),
+			'time without time zone'		=> self::column( $name, ColumnType::TIME ),
+			'timestamp without time zone'	=> self::column( $name, ColumnType::DATETIME ),
+			'timestamp with time zone'		=> self::column( $name, ColumnType::TIMESTAMP ),
+			'json', 'jsonb'					=> self::column( $name, ColumnType::JSON ),
+			'uuid'							=> self::column( $name, ColumnType::UUID ),
+			default							=> self::column( $name, ColumnType::LONG_TEXT ),
 		};
 
 		if ( 'numeric' === $data_type && null === $precision ) {

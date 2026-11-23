@@ -336,7 +336,7 @@ final class BackupManager {
 	 * The source engine as the header records it.
 	 *
 	 * @param AbstractBackupDialect $dialect
-	 * @return array<string, mixed>
+	 * @return array{engine: string, version: string|null, database: string}
 	 */
 	private function describe_source( AbstractBackupDialect $dialect ) : array {
 		$version = null;
@@ -453,7 +453,7 @@ final class BackupManager {
 	 * Validate backup options and fill in defaults.
 	 *
 	 * @param array<string, mixed> $options
-	 * @return array<string, mixed>
+	 * @return array{tables: string[]|null, exclude: string[], data: bool, consistent: bool, compress: bool|null, batch_size: int, on_progress: callable|null}
 	 * @throws BackupException
 	 */
 	private static function backup_options( array $options ) : array {
@@ -474,7 +474,7 @@ final class BackupManager {
 	 * Validate restore options and fill in defaults.
 	 *
 	 * @param array<string, mixed> $options
-	 * @return array<string, mixed>
+	 * @return array{existing: string, tables: string[]|null, exclude: string[], data: bool, batch_size: int, on_progress: callable|null}
 	 * @throws BackupException
 	 */
 	private static function restore_options( array $options ) : array {

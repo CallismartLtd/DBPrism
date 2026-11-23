@@ -53,7 +53,7 @@ final class BackupReport {
 	/**
 	 * The report as an array, e.g. to log or return as JSON.
 	 *
-	 * @return array<string, mixed>
+	 * @return array{engine: string, tables: array<string, int>, rows: int, consistent: bool, data: bool, checksum: string, bytes: int, duration: float, warnings: string[]}
 	 */
 	public function to_array() : array {
 		return [
